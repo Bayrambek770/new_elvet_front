@@ -1,0 +1,859 @@
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { tokenStore, api } from "@/lib/apiClient";
+import { useMe } from "@/hooks/api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Heart, LogOut, User, Image as ImageIcon, Loader2, ExternalLink } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { MedicalCards, Medicines, Services, Pets, Visits, Requests as RequestsApi, ServiceUsages, MedicineUsages, Clients, Doctors } from "@/lib/api";
+import elvetLogo from "@/assets/elvet_logo.jpg";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+const ModeratorDashboard = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isPublic = new URLSearchParams(location.search).get("public") === "1";
+  const { toast } = useToast();
+  const { t } = useTranslation();
+  const { data: me } = useMe();
+  const qc = useQueryClient();
+  const [loading, setLoading] = useState(true);
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const [kpis, setKpis] = useState({ medicinesAvailable: 0, servicesCount: 0, visitsCount: 0 });
+
+  // Medical cards (waiting for payment)
+  const [waitingLoading, setWaitingLoading] = useState(false);
+  const [waitingCards, setWaitingCards] = useState<any[]>([]);
+  const [selectedCard, setSelectedCard] = useState<any | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [itemsLoading, setItemsLoading] = useState(false);
+  const [cardServices, setCardServices] = useState<any[]>([]);
+  const [cardMedicines, setCardMedicines] = useState<any[]>([]);
+
+  // Visits state
+  const [visitsLoading, setVisitsLoading] = useState(false);
+  const [visitsPage, setVisitsPage] = useState<{ count?: number; next?: string | null; previous?: string | null; results: any[] }>({ results: [] });
+
+  // Visit creation state
+  const [visitClientId, setVisitClientId] = useState<string>("");
+  const [visitDoctorId, setVisitDoctorId] = useState<string>("");
+  const [visitPetId, setVisitPetId] = useState<string>("");
+  const [visitCreating, setVisitCreating] = useState(false);
+  const [clientsList, setClientsList] = useState<any[]>([]);
+  const [doctorsList, setDoctorsList] = useState<any[]>([]);
+  const [petsList, setPetsList] = useState<any[]>([]);
+  const [listsLoading, setListsLoading] = useState(false);
+  // Name caches for visits rendering
+  const [clientNames, setClientNames] = useState<Record<string | number, string>>({});
+  const [doctorNames, setDoctorNames] = useState<Record<string | number, string>>({});
+  const [petNames, setPetNames] = useState<Record<string | number, string>>({});
+
+  // Password reset removed per requirement (no longer used)
+
+  // Requests inbox (simplified listing)
+  const [rqLoading, setRqLoading] = useState(false);
+  const [rqPage, setRqPage] = useState<{ count?: number; next?: string | null; previous?: string | null; results: any[] }>({ results: [] });
+
+  useEffect(() => {
+    setLoading(false);
+    void fetchKpis();
+  }, [isPublic]);
+
+  const fetchKpis = async () => {
+    try {
+      const [meds, serv, visits] = await Promise.all([
+        Medicines.availableCount<{ count: number }>(),
+        Services.count<{ count: number }>(),
+        // Visits list used to derive total count (fallback to array length if not paginated)
+        Visits.list<{ count?: number; results?: any[] }>().catch(() => ({ count: 0 })),
+      ]);
+      const visitsCount = (visits as any)?.count ?? (Array.isArray(visits) ? (visits as any).length : (visits as any)?.results?.length ?? 0);
+      setKpis({ medicinesAvailable: meds.count || 0, servicesCount: serv.count || 0, visitsCount });
+    } catch (e) {
+      // ignore KPI errors for now, keep zeroes
+    }
+  };
+
+  const loadWaitingCards = async () => {
+    setWaitingLoading(true);
+    try {
+      // Try request with filters first (if backend supports); fallback to client-side filtering
+      const data = await MedicalCards.list<any>({ payment_confirmed: false, is_paid: false, status: "WAITING_FOR_PAYMENT" } as any).catch(async () => await MedicalCards.list<any>());
+      const arr = Array.isArray(data) ? data : (data as any)?.results || [];
+      const filtered = arr.filter((c: any) => {
+        const paid = c.payment_confirmed ?? c.is_paid ?? false;
+        const status = (c.status || "").toString().toUpperCase();
+        return !paid || status.includes("WAITING") || status.includes("ОЖИДАЕТ");
+      });
+      setWaitingCards(filtered);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить карты" });
+    } finally {
+      setWaitingLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadWaitingCards();
+  }, []);
+
+  // Auto-load client requests on initial mount
+  useEffect(() => {
+    void handleLoadRequests();
+  }, []);
+
+  // Load services and medicines for selected card
+  useEffect(() => {
+    const loadItems = async (cardId?: number) => {
+      if (!cardId) return;
+      setItemsLoading(true);
+      try {
+        const [servicesRes, medsRes] = await Promise.all([
+          ServiceUsages.list<any>({ medical_card: cardId }).catch(() => ServiceUsages.list<any>({ card: cardId })),
+          MedicineUsages.list<any>({ medical_card: cardId }).catch(() => MedicineUsages.list<any>({ card: cardId })),
+        ]);
+        const toArray = (d: any) => (Array.isArray(d) ? d : d?.results || []);
+        setCardServices(toArray(servicesRes));
+        setCardMedicines(toArray(medsRes));
+      } catch (e: any) {
+        toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить позиции карты" });
+        setCardServices([]);
+        setCardMedicines([]);
+      } finally {
+        setItemsLoading(false);
+      }
+    };
+    if (selectedCard?.id) {
+      void loadItems(Number(selectedCard.id));
+    } else {
+      setCardServices([]);
+      setCardMedicines([]);
+      setItemsLoading(false);
+    }
+  }, [selectedCard, toast]);
+
+  const handleSearchVisits = async () => {
+    setVisitsLoading(true);
+    try {
+      const data = await Visits.list<{ count?: number; next?: string; previous?: string; results?: any[] }>();
+      setVisitsPage({ count: (data as any).count, next: (data as any).next, previous: (data as any).previous, results: (data as any).results || (Array.isArray(data) ? (data as any) : []) });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить визиты" });
+    } finally {
+      setVisitsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void handleSearchVisits();
+  }, []);
+
+  const loadLists = async (clientIdForPets?: string) => {
+    setListsLoading(true);
+    try {
+      const [clients, doctors, pets] = await Promise.all([
+        Clients.list<any>().catch(() => []),
+        Doctors.list<any>().catch(() => []),
+        Pets.list<any>(clientIdForPets ? { client: clientIdForPets } as any : undefined).catch(() => []),
+      ]);
+      setClientsList(Array.isArray(clients) ? clients : (clients as any)?.results || []);
+      setDoctorsList(Array.isArray(doctors) ? doctors : (doctors as any)?.results || []);
+      setPetsList(Array.isArray(pets) ? pets : (pets as any)?.results || []);
+      // Seed name maps from fetched lists (best-effort)
+      const cMap: Record<string | number, string> = {};
+      (Array.isArray(clients) ? clients : (clients as any)?.results || []).forEach((c: any) => {
+        const candidate = c.full_name ?? c.name ?? c.username ?? [c.first_name, c.last_name].filter(Boolean).join(" ");
+        if (candidate) cMap[c.id] = candidate;
+      });
+      const dMap: Record<string | number, string> = {};
+      (Array.isArray(doctors) ? doctors : (doctors as any)?.results || []).forEach((d: any) => {
+        const candidate = d.full_name ?? d.name ?? d.username ?? d.user?.full_name ?? [d.first_name, d.last_name].filter(Boolean).join(" ");
+        if (candidate) dMap[d.id] = candidate;
+      });
+      const pMap: Record<string | number, string> = {};
+      (Array.isArray(pets) ? pets : (pets as any)?.results || []).forEach((p: any) => {
+        const candidate = p.name ?? p.nickname;
+        if (candidate) pMap[p.id] = candidate;
+      });
+      setClientNames((prev) => ({ ...prev, ...cMap }));
+      setDoctorNames((prev) => ({ ...prev, ...dMap }));
+      setPetNames((prev) => ({ ...prev, ...pMap }));
+    } finally {
+      setListsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadLists();
+  }, []);
+
+  useEffect(() => {
+    // Reload pets for selected client in creation form
+    if (visitClientId) {
+      void loadLists(visitClientId);
+    }
+  }, [visitClientId]);
+
+  const handleCreateVisit = async () => {
+    if (!visitClientId || !visitDoctorId || !visitPetId) {
+      toast({ variant: "destructive", title: "Проверьте поля", description: "Выберите клиента, врача и питомца" });
+      return;
+    }
+    setVisitCreating(true);
+    try {
+      await Visits.create({ client: Number(visitClientId), doctor: Number(visitDoctorId), pet: Number(visitPetId) });
+      toast({ title: "Визит создан" });
+      setVisitClientId("");
+      setVisitDoctorId("");
+      setVisitPetId("");
+      await handleSearchVisits();
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось создать визит" });
+    } finally {
+      setVisitCreating(false);
+    }
+  };
+
+  // After visits load, resolve missing names by fetching individually (cached)
+  useEffect(() => {
+    const resolve = async () => {
+      const missingClients = new Set<string | number>();
+      const missingDoctors = new Set<string | number>();
+      const missingPets = new Set<string | number>();
+      for (const v of visitsPage.results) {
+        if ((typeof v.client === 'number' || typeof v.client === 'string') && !clientNames[v.client]) missingClients.add(v.client);
+        if ((typeof v.doctor === 'number' || typeof v.doctor === 'string') && !doctorNames[v.doctor]) missingDoctors.add(v.doctor);
+        if ((typeof v.pet === 'number' || typeof v.pet === 'string') && !petNames[v.pet]) missingPets.add(v.pet);
+      }
+      try {
+        await Promise.all([
+          ...Array.from(missingClients).map(async (id) => {
+            try {
+              const c = await Clients.get<any>(id);
+              const candidate = c?.full_name ?? c?.name ?? c?.username ?? [c?.first_name, c?.last_name].filter(Boolean).join(' ');
+              if (candidate) setClientNames((prev) => ({ ...prev, [id]: candidate }));
+            } catch {}
+          }),
+          ...Array.from(missingDoctors).map(async (id) => {
+            try {
+              const d = await Doctors.get<any>(id);
+              const candidate = d?.full_name ?? d?.name ?? d?.username ?? d?.user?.full_name ?? [d?.first_name, d?.last_name].filter(Boolean).join(' ');
+              if (candidate) setDoctorNames((prev) => ({ ...prev, [id]: candidate }));
+            } catch {}
+          }),
+          ...Array.from(missingPets).map(async (id) => {
+            try {
+              const p = await Pets.get<any>(id);
+              const candidate = p?.name ?? p?.nickname;
+              if (candidate) setPetNames((prev) => ({ ...prev, [id]: candidate }));
+            } catch {}
+          }),
+        ]);
+      } catch {
+        // ignore name resolution errors
+      }
+    };
+    if (visitsPage.results?.length) void resolve();
+  }, [visitsPage.results, clientNames, doctorNames, petNames]);
+
+  const fetchPageByUrl = async (url?: string | null) => {
+    if (!url) return null;
+    const { data } = await api.get(url);
+    return data;
+  };
+
+  const handleVisitsPageNav = async (dir: "next" | "previous") => {
+    const url = dir === "next" ? visitsPage.next : visitsPage.previous;
+    if (!url) return;
+    setVisitsLoading(true);
+    try {
+      const data = await fetchPageByUrl(url);
+      setVisitsPage({ count: data?.count, next: data?.next, previous: data?.previous, results: data?.results || [] });
+    } finally {
+      setVisitsLoading(false);
+    }
+  };
+
+  // handlePasswordReset removed
+
+  const handleLoadRequests = async (url?: string) => {
+    setRqLoading(true);
+    try {
+      const raw = url ? (await fetchPageByUrl(url)) : await RequestsApi.list<any>();
+      // Normalize various possible backend shapes:
+      // 1) Paginated: { count, next, previous, results: [...] }
+      // 2) Plain array: [...]
+      // 3) Wrapped with data/results alternative naming
+      let results: any[] = [];
+      let count: number | undefined = undefined;
+      let next: string | null | undefined = undefined;
+      let previous: string | null | undefined = undefined;
+      if (Array.isArray(raw)) {
+        results = raw;
+        count = raw.length;
+      } else if (raw && typeof raw === 'object') {
+        const maybeResults = (raw.results || raw.items || raw.data || raw.list);
+        if (Array.isArray(maybeResults)) {
+          results = maybeResults;
+          count = raw.count ?? maybeResults.length;
+          next = raw.next ?? null;
+          previous = raw.previous ?? null;
+        } else {
+          // Single object? wrap it for display
+          results = [raw];
+          count = 1;
+        }
+      }
+      setRqPage({ count, next, previous, results });
+      // Fallback: if empty but no error and not loading a specific page, attempt alternative endpoint without trailing slash
+      if (!url && results.length === 0) {
+        try {
+          const alt = await api.get('requests').then(r => r.data);
+          if (Array.isArray(alt) && alt.length) {
+            setRqPage({ count: alt.length, next: null, previous: null, results: alt });
+          } else if (alt?.results && Array.isArray(alt.results) && alt.results.length) {
+            setRqPage({ count: alt.count ?? alt.results.length, next: alt.next ?? null, previous: alt.previous ?? null, results: alt.results });
+          }
+        } catch {}
+      }
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить запросы" });
+    } finally {
+      setRqLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    tokenStore.clear();
+    toast({
+      title: t("dashboard.logout"),
+      description: "До свидания!",
+    });
+    navigate("/");
+  };
+
+  const handleBannerImageChange = async (file?: File | null) => {
+    if (!file) return;
+    setBannerUploading(true);
+    try {
+      const form = new FormData();
+      form.append("image", file);
+      const { data } = await api.patch(`me/`, form, { headers: { "Content-Type": "multipart/form-data" } });
+      qc.setQueryData(["me"], (prev: any) => ({ ...(prev || {}), image: data?.image ?? prev?.image ?? null }));
+      await qc.invalidateQueries({ queryKey: ["me"] });
+      toast({ title: "Фото обновлено" });
+    } catch (e: any) {
+      toast({ title: "Ошибка", description: e?.message || "Не удалось обновить фото", variant: "destructive" });
+    } finally {
+      setBannerUploading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background">
+        <div className="animate-pulse">
+          <Heart className="w-12 h-12 text-primary" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
+      {/* Header */}
+      <header className="border-b bg-background/80 backdrop-blur-md sticky top-0 z-50 animate-fade-in">
+        <div className="container px-4 py-4 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="flex items-center gap-3 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary transition hover:opacity-90 hover-scale"
+            aria-label="Вернуться на главную"
+          >
+            <img src={elvetLogo} alt="ELVET" className="w-12 h-12 rounded-xl object-cover shadow-glow border border-white/30" />
+            <div className="text-left">
+              <h1 className="text-xl font-bold bg-gradient-hero bg-clip-text text-transparent">ELVET</h1>
+              <p className="text-xs text-muted-foreground">{t("dashboard.moderator")}</p>
+            </div>
+          </button>
+          <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+            <Button variant="outline" onClick={handleLogout} className="gap-2 hover-scale">
+              <LogOut className="w-4 h-4" />
+              {t("dashboard.logout")}
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="container px-4 py-8">
+        {/* Hero Welcome Card with inline avatar change */}
+        <Card className="overflow-hidden border-0 shadow-elegant animate-fade-in mb-8">
+          <div className="bg-gradient-hero p-8 text-primary-foreground relative">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnoiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4xIi8+PC9nPjwvc3ZnPg==')] opacity-20" />
+            <div className="relative flex items-center gap-4">
+              <div className="p-2 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-white/40 flex items-center justify-center relative group">
+                  {me?.image ? (
+                    // eslint-disable-next-line jsx-a11y/alt-text
+                    <img src={me.image} alt="avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="w-10 h-10" />
+                  )}
+                  <label className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleBannerImageChange(e.target.files?.[0])} />
+                    <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/90 text-black px-3 py-1 rounded-full shadow">
+                      <ImageIcon className="w-4 h-4" /> {bannerUploading ? 'Загрузка…' : 'Изменить'}
+                    </span>
+                  </label>
+                </div>
+              </div>
+              <div>
+                <h2 className="text-3xl font-bold mb-1">
+                  {t("dashboard.welcome")}, {me?.first_name ? `${me.first_name}` : "Модератор"}! 👤
+                </h2>
+                <p className="text-primary-foreground/90 text-lg">Панель модератора клиники</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* KPI Grid */}
+        <div className="grid md:grid-cols-3 gap-6 mb-8">
+          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("moderator.kpi.medicinesAvailable")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">{kpis.medicinesAvailable}</div>
+              <p className="text-xs text-muted-foreground mt-1">quantity &gt; 0</p>
+            </CardContent>
+          </Card>
+          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("moderator.kpi.servicesCount")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">{kpis.servicesCount}</div>
+            </CardContent>
+          </Card>
+          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("moderator.kpi.visitsCount")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">{kpis.visitsCount}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Dashboard Tabs */}
+        <Tabs defaultValue="medicalCards" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-8 h-auto p-1">
+            <TabsTrigger value="medicalCards" className="gap-2 py-3">{t("dashboard.medicalCards")}</TabsTrigger>
+            <TabsTrigger value="visits" className="gap-2 py-3">{t("moderator.tabs.visits")}</TabsTrigger>
+            <TabsTrigger value="requests" className="gap-2 py-3">{t("moderator.tabs.requests")}</TabsTrigger>
+          </TabsList>
+
+          {/* Medical Cards: Waiting for Payment */}
+          <TabsContent value="medicalCards" className="space-y-6 animate-fade-in">
+            <Card className="border-2">
+              <CardHeader>
+                <CardTitle>{t("moderator.medicalCards.title")}</CardTitle>
+                <CardDescription>{t("moderator.medicalCards.subtitle")}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Button variant="outline" onClick={loadWaitingCards} disabled={waitingLoading} className="gap-2">
+                    {waitingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+                    {t("moderator.medicalCards.refresh")}
+                  </Button>
+                </div>
+
+                <div className="rounded-lg border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Клиент</TableHead>
+                        <TableHead>Питомец</TableHead>
+                        <TableHead>Сумма</TableHead>
+                        <TableHead>Статус</TableHead>
+                        <TableHead className="text-right">Действия</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {waitingLoading ? (
+                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{t("common.loading")}</TableCell></TableRow>
+                      ) : waitingCards.length === 0 ? (
+                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{t("common.empty")}</TableCell></TableRow>
+                      ) : (
+                        waitingCards.map((c: any) => (
+                          <TableRow key={c.id}>
+                            <TableCell>{c.id}</TableCell>
+                            <TableCell>{c.client?.full_name ?? c.client_name ?? c.client ?? "—"}</TableCell>
+                            <TableCell>{c.pet?.name ?? c.pet_name ?? c.pet ?? "—"}</TableCell>
+                            <TableCell>{c.total_amount ?? c.total ?? "—"}</TableCell>
+                            <TableCell>{c.status ?? (c.payment_confirmed ? t("client.medicalCards.status.paid") : t("client.medicalCards.status.pending"))}</TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm" className="gap-2" onClick={() => setSelectedCard(c)}>{t("common.view")}</Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Visits */}
+          <TabsContent value="visits" className="space-y-6 animate-fade-in">
+            {/* Create Visit */}
+            <Card className="border-2">
+              <CardHeader>
+                <CardTitle>{t("moderator.visits.create.title")}</CardTitle>
+                <CardDescription>{t("moderator.visits.create.subtitle")}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid md:grid-cols-3 gap-3">
+                  <div>
+                    <Label>Клиент</Label>
+                    <Select value={visitClientId} onValueChange={(v) => setVisitClientId(v)}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder={listsLoading ? "Загрузка…" : "Выберите клиента"} /></SelectTrigger>
+                      <SelectContent>
+                        {clientsList.map((c: any) => {
+                          const candidate = c.full_name ?? c.name ?? c.username ?? [c.first_name, c.last_name].filter(Boolean).join(" ");
+                          const label = candidate && candidate.length > 0 ? candidate : `#${c.id}`;
+                          return (
+                            <SelectItem key={`client-${c.id}`} value={String(c.id)}>{label}</SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Врач</Label>
+                    <Select value={visitDoctorId} onValueChange={(v) => setVisitDoctorId(v)}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder={listsLoading ? "Загрузка…" : "Выберите врача"} /></SelectTrigger>
+                      <SelectContent>
+                        {doctorsList.map((d: any) => {
+                          const candidate = d.full_name ?? d.name ?? d.username ?? d.user?.full_name ?? [d.first_name, d.last_name].filter(Boolean).join(" ");
+                          const label = candidate && candidate.length > 0 ? candidate : `#${d.id}`;
+                          return (
+                            <SelectItem key={`doctor-${d.id}`} value={String(d.id)}>{label}</SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Питомец</Label>
+                    <Select value={visitPetId} onValueChange={(v) => setVisitPetId(v)}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder={listsLoading ? "Загрузка…" : "Выберите питомца"} /></SelectTrigger>
+                      <SelectContent>
+                        {petsList.map((p: any) => (
+                          <SelectItem key={`pet-${p.id}`} value={String(p.id)}>{p.name ?? p.nickname ?? `#${p.id}`}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Button onClick={handleCreateVisit} disabled={visitCreating} className="gap-2">
+                    {visitCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+                    {t("common.create")}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-2">
+              <CardHeader>
+                <CardTitle>{t("moderator.visits.history.title")}</CardTitle>
+                <CardDescription>{t("moderator.visits.history.subtitle")}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Button onClick={handleSearchVisits} disabled={visitsLoading} variant="outline" className="gap-2">
+                    {visitsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+                    {t("moderator.visits.refresh")}
+                  </Button>
+                </div>
+
+                <div className="rounded-lg border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Дата</TableHead>
+                        <TableHead>Клиент</TableHead>
+                        <TableHead>Врач</TableHead>
+                        <TableHead>Питомец</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visitsPage.results.length === 0 ? (
+                        <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">{t("common.empty")}</TableCell></TableRow>
+                      ) : (
+                        visitsPage.results.map((v: any, idx: number) => (
+                          <TableRow key={v.id ?? idx}>
+                            <TableCell>{v.created_at ? new Date(v.created_at).toLocaleString("ru-RU") : "—"}</TableCell>
+                            <TableCell>{v.client?.full_name ?? clientNames[v.client] ?? "—"}</TableCell>
+                            <TableCell>{v.doctor?.full_name ?? doctorNames[v.doctor] ?? "—"}</TableCell>
+                            <TableCell>{v.pet?.name ?? petNames[v.pet] ?? "—"}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="flex justify-between">
+                  <Button variant="outline" disabled={!visitsPage.previous} onClick={() => handleVisitsPageNav("previous")}>{t("common.prev")}</Button>
+                  <Button variant="outline" disabled={!visitsPage.next} onClick={() => handleVisitsPageNav("next")}>{t("common.next")}</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Requests inbox */}
+          <TabsContent value="requests" className="space-y-6 animate-fade-in">
+            <Card className="border-2">
+              <CardHeader>
+                <CardTitle>{t("moderator.requests.title")} {typeof rqPage.count === 'number' ? `(${rqPage.count})` : ''}</CardTitle>
+                <CardDescription>{t("moderator.requests.subtitle")}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Button onClick={() => handleLoadRequests()} disabled={rqLoading} variant="outline" className="gap-2">
+                    {rqLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+                    {t("moderator.requests.refresh")}
+                  </Button>
+                </div>
+                <div className="rounded-lg border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Имя</TableHead>
+                        <TableHead>Фамилия</TableHead>
+                        <TableHead>Телефон</TableHead>
+                        <TableHead>Создано</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rqPage.results.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">{t("common.empty")}</TableCell></TableRow>
+                      ) : (
+                        rqPage.results.map((r: any) => (
+                          <TableRow key={r.id}>
+                            <TableCell>{r.id}</TableCell>
+                            <TableCell>{r.first_name || "—"}</TableCell>
+                            <TableCell>{r.last_name || "—"}</TableCell>
+                            <TableCell>{r.phone_number ?? r.phone ?? "—"}</TableCell>
+                            <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString("ru-RU") : "—"}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="flex justify-between">
+                  <Button variant="outline" disabled={!rqPage.previous} onClick={() => handleLoadRequests(rqPage.previous || undefined)}>{t("common.prev")}</Button>
+                  <Button variant="outline" disabled={!rqPage.next} onClick={() => handleLoadRequests(rqPage.next || undefined)}>{t("common.next")}</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Modal: Medical card details and confirm payment */}
+          {selectedCard && (
+            <Dialog open={!!selectedCard} onOpenChange={(open) => { if (!open) setSelectedCard(null); }}>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>{t("moderator.card.modal.title", { id: selectedCard?.id })}</DialogTitle>
+                  <DialogDescription>{t("moderator.card.modal.subtitle")}</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-3">
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.client")}</p>
+                      <p className="font-medium">{selectedCard?.client?.full_name ?? selectedCard?.client_name ?? selectedCard?.client ?? "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.pet")}</p>
+                      <p className="font-medium">{selectedCard?.pet?.name ?? selectedCard?.pet_name ?? selectedCard?.pet ?? "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.status")}</p>
+                      <p className="font-medium">{selectedCard?.status ?? (selectedCard?.payment_confirmed ? t("client.medicalCards.status.paid") : t("client.medicalCards.status.pending"))}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.total")}</p>
+                      <p className="font-semibold">{selectedCard?.total_amount ?? selectedCard?.total ?? "—"}</p>
+                    </div>
+                  </div>
+
+                  {selectedCard?.anamnesis && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Анамнез</p>
+                      <div className="border rounded p-2 bg-muted/30 whitespace-pre-wrap text-sm">{selectedCard.anamnesis}</div>
+                    </div>
+                  )}
+
+                  {/* Fee breakdown */}
+                  <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="p-3 border rounded-lg bg-background">
+                      <p className="text-xs text-muted-foreground">Всего (total_fee)</p>
+                      <p className="font-semibold">{selectedCard?.total_fee ?? selectedCard?.total_amount ?? selectedCard?.total ?? "—"}</p>
+                    </div>
+                    <div className="p-3 border rounded-lg bg-background">
+                      <p className="text-xs text-muted-foreground">Стационар (stationary_fee)</p>
+                      <p className="font-semibold">{selectedCard?.stationary_fee ?? selectedCard?.stationary_total ?? "—"}</p>
+                    </div>
+                    <div className="p-3 border rounded-lg bg-background">
+                      <p className="text-xs text-muted-foreground">Корма (feeds_fee)</p>
+                      <p className="font-semibold">{selectedCard?.feeds_fee ?? selectedCard?.feeds_total ?? "—"}</p>
+                    </div>
+                    <div className="p-3 border rounded-lg bg-background">
+                      <p className="text-xs text-muted-foreground">Препараты (medicines_fee)</p>
+                      <p className="font-semibold">{selectedCard?.medicines_fee ?? selectedCard?.medicines_total ?? "—"}</p>
+                    </div>
+                    <div className="p-3 border rounded-lg bg-background">
+                      <p className="text-xs text-muted-foreground">Услуги (services_fee)</p>
+                      <p className="font-semibold">{selectedCard?.services_fee ?? selectedCard?.services_total ?? "—"}</p>
+                    </div>
+                  </div>
+
+                  {/* Used services */}
+                  <div>
+                    <p className="text-sm font-semibold mb-2">Использованные услуги ({cardServices.length})</p>
+                    {itemsLoading ? (
+                      <p className="text-sm text-muted-foreground">Загрузка…</p>
+                    ) : cardServices.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Нет услуг</p>
+                    ) : (
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Услуга</TableHead>
+                              <TableHead>Кол-во</TableHead>
+                              <TableHead>Цена</TableHead>
+                              <TableHead>Сумма</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {cardServices.map((s: any, idx: number) => {
+                              const name = s?.service?.name ?? s?.services?.name ?? s?.service_name ?? s?.name ?? `#${s?.id ?? idx}`;
+                              const qty = s?.quantity ?? s?.qty ?? 1;
+                              const price = s?.price ?? s?.unit_price ?? 0;
+                              const total = Number(qty) * Number(price);
+                              return (
+                                <TableRow key={`svc-${s?.id ?? idx}`}>
+                                  <TableCell>{name}</TableCell>
+                                  <TableCell>{qty}</TableCell>
+                                  <TableCell>{price} сум</TableCell>
+                                  <TableCell className="font-semibold">{total} сум</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Used medicines */}
+                  <div>
+                    <p className="text-sm font-semibold mb-2">Использованные препараты ({cardMedicines.length})</p>
+                    {itemsLoading ? (
+                      <p className="text-sm text-muted-foreground">Загрузка…</p>
+                    ) : cardMedicines.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Нет препаратов</p>
+                    ) : (
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Препарат</TableHead>
+                              <TableHead>Кол-во</TableHead>
+                              <TableHead>Цена</TableHead>
+                              <TableHead>Сумма</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {cardMedicines.map((m: any, idx: number) => {
+                              const name = m?.medicine?.name ?? m?.medicines?.name ?? m?.medicine_name ?? m?.name ?? `#${m?.id ?? idx}`;
+                              const qty = m?.quantity ?? m?.qty ?? 1;
+                              const price = m?.price ?? m?.unit_price ?? 0;
+                              const total = Number(qty) * Number(price);
+                              return (
+                                <TableRow key={`med-${m?.id ?? idx}`}>
+                                  <TableCell>{name}</TableCell>
+                                  <TableCell>{qty}</TableCell>
+                                  <TableCell>{price} сум</TableCell>
+                                  <TableCell className="font-semibold">{total} сум</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setSelectedCard(null)}>{t("common.close")}</Button>
+                  <Button
+                    onClick={async () => {
+                      if (!selectedCard?.id) return;
+                      setConfirmLoading(true);
+                      try {
+                        await MedicalCards.confirmPayment(selectedCard.id);
+                        toast({ title: t("common.confirmed") });
+                        setSelectedCard(null);
+                        await loadWaitingCards();
+                      } catch (e: any) {
+                        toast({ variant: "destructive", title: t("common.error"), description: e?.message || t("common.error") });
+                      } finally {
+                        setConfirmLoading(false);
+                      }
+                    }}
+                    disabled={confirmLoading}
+                    className="gap-2"
+                  >
+                    {confirmLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    {t("common.confirmPayment")}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+        </Tabs>
+      </div>
+    </div>
+  );
+};
+
+export default ModeratorDashboard;
