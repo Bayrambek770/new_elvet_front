@@ -101,8 +101,19 @@ export const MedicalCards = {
     const { data } = await api.get<T>(`medical-cards/total-fee/by-user/${userId}/`);
     return data;
   },
-  confirmPayment: async <T = { detail?: string }>(id: ID) => {
-    const { data } = await api.post<T>(`medical-cards/${id}/confirm-payment/`, {});
+  confirmPayment: async <T = any>(id: ID, body?: { method?: "CASH" | "CLICK" | "PAYME" | "OTHER"; note?: string }) => {
+    const { data } = await api.post<T>(`medical-cards/${id}/confirm-payment/`, body ?? {});
+    return data;
+  },
+  receivePayment: async <T = any>(
+    id: ID,
+    body: { amount: string; method: "CASH" | "CLICK" | "PAYME" | "OTHER"; note?: string }
+  ) => {
+    const { data } = await api.post<T>(`medical-cards/${id}/receive-payment/`, body);
+    return data;
+  },
+  partlyPaid: async <T = any>() => {
+    const { data } = await api.get<T>("medical-cards/partly-paid/");
     return data;
   },
   create: <T = unknown>(body: Record<string, unknown>) => post<T>("medical-cards/", body),
@@ -145,6 +156,13 @@ export const MedicineUsages = {
   update: <T = unknown>(id: ID, body: Record<string, unknown>) => put<T>("medicine-usages/", id, body),
   patch: <T = unknown>(id: ID, body: Record<string, unknown>) => patch<T>("medicine-usages/", id, body),
   remove: (id: ID) => del("medicine-usages/", id),
+};
+
+// Payment transactions
+export const PaymentTransactions = {
+  list: <T = unknown>(params?: Record<string, unknown>) => list<T[]>("payment-transactions/", params),
+  methodTotals: async <T = { totals: Record<string, string>; grand_total: string }>(params?: Record<string, unknown>) =>
+    (await api.get<T>("payment-transactions/method-totals/", { params })).data,
 };
 
 export const FeedUsages = {
@@ -248,4 +266,12 @@ export const Requests = {
   list: async <T = any>(params?: Record<string, unknown>) => (await api.get<T>("requests/", { params })).data,
   create: async <T = any>(body: { first_name: string; last_name: string; phone_number: string; description: string }) =>
     (await api.post<T>("requests/", body)).data,
+};
+
+// Utility endpoints
+export const Utils = {
+  usedPhones: async (): Promise<{ count: number; results: string[] }> => {
+    const { data } = await api.get<{ count: number; results: string[] }>("users/used-phones/");
+    return data;
+  },
 };

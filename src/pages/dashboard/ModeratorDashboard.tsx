@@ -6,7 +6,11 @@ import { useMe } from "@/hooks/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Heart, LogOut, User, Image as ImageIcon, Loader2, ExternalLink } from "lucide-react";
+import { Heart, LogOut, User, Image as ImageIcon, Loader2, ExternalLink, Eye, EyeOff } from "lucide-react";
+import cashImg from "@/assets/cost.png";
+import clickImg from "@/assets/click-logo.png";
+import paymeImg from "@/assets/payme-logo.png";
+import otherImg from "@/assets/other.png";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,7 +25,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import { MedicalCards, Medicines, Services, Pets, Visits, Requests as RequestsApi, ServiceUsages, MedicineUsages, Clients, Doctors } from "@/lib/api";
+import { MedicalCards, Medicines, Services, Pets, Visits, Requests as RequestsApi, ServiceUsages, MedicineUsages, Clients, Doctors, Utils, PaymentTransactions } from "@/lib/api";
 import elvetLogo from "@/assets/elvet_logo.jpg";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -40,11 +44,25 @@ const ModeratorDashboard = () => {
   // Medical cards (waiting for payment)
   const [waitingLoading, setWaitingLoading] = useState(false);
   const [waitingCards, setWaitingCards] = useState<any[]>([]);
+  const [partlyCards, setPartlyCards] = useState<any[]>([]);
   const [selectedCard, setSelectedCard] = useState<any | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [itemsLoading, setItemsLoading] = useState(false);
   const [cardServices, setCardServices] = useState<any[]>([]);
   const [cardMedicines, setCardMedicines] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState<string>("");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CLICK" | "PAYME" | "OTHER" | "">("");
+  const [paymentNote, setPaymentNote] = useState<string>("");
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+
+  // Clients state (for list tab)
+  const [clientsPage, setClientsPage] = useState<{ count?: number; next?: string | null; previous?: string | null; results: any[] }>({ results: [] });
+  const [clientsLoading, setClientsLoading] = useState(false);
+  const [clientFilterId, setClientFilterId] = useState<string>("");
+  const [clientFilterName, setClientFilterName] = useState<string>("");
+  const [clientFilterPhone, setClientFilterPhone] = useState<string>("");
 
   // Visits state
   const [visitsLoading, setVisitsLoading] = useState(false);
@@ -102,6 +120,14 @@ const ModeratorDashboard = () => {
         return !paid || status.includes("WAITING") || status.includes("ОЖИДАЕТ");
       });
       setWaitingCards(filtered);
+      // Also load partly-paid cards (best-effort)
+      try {
+        const partly = await MedicalCards.partlyPaid<any>();
+        const pArr = Array.isArray(partly) ? partly : (partly as any)?.results || [];
+        setPartlyCards(pArr);
+      } catch {
+        setPartlyCards([]);
+      }
     } catch (e: any) {
       toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить карты" });
     } finally {
@@ -141,12 +167,28 @@ const ModeratorDashboard = () => {
     };
     if (selectedCard?.id) {
       void loadItems(Number(selectedCard.id));
+      void loadPayments(Number(selectedCard.id));
     } else {
       setCardServices([]);
       setCardMedicines([]);
       setItemsLoading(false);
+      setPayments([]);
     }
   }, [selectedCard, toast]);
+
+  const loadPayments = async (cardId: number) => {
+    setPaymentsLoading(true);
+    try {
+      const data = await PaymentTransactions.list<any>({ medical_card: cardId });
+      const arr = Array.isArray(data) ? data : (data as any)?.results || [];
+      setPayments(arr);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить платежи" });
+      setPayments([]);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
 
   const handleSearchVisits = async () => {
     setVisitsLoading(true);
@@ -163,6 +205,100 @@ const ModeratorDashboard = () => {
   useEffect(() => {
     void handleSearchVisits();
   }, []);
+
+  // Auto-load clients once on mount so the list is ready when the tab is opened
+  useEffect(() => {
+    void handleLoadClients();
+  }, []);
+
+  // Re-load clients when any filter changes (debounced)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      void handleLoadClients();
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [clientFilterId, clientFilterName, clientFilterPhone]);
+
+  const handleLoadClients = async () => {
+    setClientsLoading(true);
+    try {
+      const params: Record<string, any> = {};
+      if (clientFilterId.trim()) params.id = clientFilterId.trim();
+      if (clientFilterName.trim()) params.name = clientFilterName.trim();
+      if (clientFilterPhone.trim()) params.phone_number = clientFilterPhone.trim();
+
+      const data = await Clients.list<{ count?: number; next?: string | null; previous?: string | null; results?: any[] }>(params as any);
+
+      // Normalize to array
+      const rawResults: any[] = Array.isArray(data) ? (data as any[]) : ((data as any)?.results || []);
+
+      // Apply strict client-side filtering so wrong input always hides rows
+      const idQuery = clientFilterId.trim();
+      const nameQuery = clientFilterName.trim().toLowerCase();
+      const phoneQuery = clientFilterPhone.trim().toLowerCase();
+
+      const filteredResults = rawResults.filter((c: any) => {
+        const idStr = c?.id != null ? String(c.id) : "";
+        const nameStr = [
+          c?.full_name,
+          c?.name,
+          c?.username,
+          c?.first_name,
+          c?.last_name,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const phoneStr = [
+          c?.phone_number,
+          c?.phone,
+          c?.extra_number1,
+          c?.extra_number2,
+          c?.profile?.extra_number1,
+          c?.profile?.extra_number2,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        const idOk = idQuery ? idStr.includes(idQuery) : true;
+        const nameOk = nameQuery ? nameStr.includes(nameQuery) : true;
+        const phoneOk = phoneQuery ? phoneStr.includes(phoneQuery) : true;
+
+        return idOk && nameOk && phoneOk;
+      });
+
+      setClientsPage({
+        count: filteredResults.length,
+        next: null,
+        previous: null,
+        results: filteredResults,
+      });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить клиентов" });
+    } finally {
+      setClientsLoading(false);
+    }
+  };
+
+  const fetchClientsPageByUrl = async (url?: string | null) => {
+    if (!url) return;
+    setClientsLoading(true);
+    try {
+      // Preserve current search term when navigating between pages if backend supports it via query params on next/previous URLs
+      const data = await api.get(url).then((r) => r.data);
+      setClientsPage({
+        count: data?.count,
+        next: data?.next ?? null,
+        previous: data?.previous ?? null,
+        results: data?.results || [],
+      });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить клиентов" });
+    } finally {
+      setClientsLoading(false);
+    }
+  };
 
   const loadLists = async (clientIdForPets?: string) => {
     setListsLoading(true);
@@ -466,10 +602,12 @@ const ModeratorDashboard = () => {
 
         {/* Dashboard Tabs */}
         <Tabs defaultValue="medicalCards" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8 h-auto p-1">
+          <TabsList className="grid w-full grid-cols-5 mb-8 h-auto p-1">
             <TabsTrigger value="medicalCards" className="gap-2 py-3">{t("dashboard.medicalCards")}</TabsTrigger>
             <TabsTrigger value="visits" className="gap-2 py-3">{t("moderator.tabs.visits")}</TabsTrigger>
             <TabsTrigger value="requests" className="gap-2 py-3">{t("moderator.tabs.requests")}</TabsTrigger>
+            <TabsTrigger value="clients" className="gap-2 py-3">Клиенты</TabsTrigger>
+            <TabsTrigger value="addUser" className="gap-2 py-3">Добавить пользователя</TabsTrigger>
           </TabsList>
 
           {/* Medical Cards: Waiting for Payment */}
@@ -479,7 +617,7 @@ const ModeratorDashboard = () => {
                 <CardTitle>{t("moderator.medicalCards.title")}</CardTitle>
                 <CardDescription>{t("moderator.medicalCards.subtitle")}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 <div>
                   <Button variant="outline" onClick={loadWaitingCards} disabled={waitingLoading} className="gap-2">
                     {waitingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
@@ -521,7 +659,181 @@ const ModeratorDashboard = () => {
                     </TableBody>
                   </Table>
                 </div>
+
+                {/* Partly-paid cards */}
+                <div className="rounded-lg border mt-6 overflow-x-auto">
+                  <div className="px-4 py-3 border-b bg-muted/40 flex items-center justify-between">
+                    <p className="font-semibold text-sm">Карты с частичной оплатой ({partlyCards.length})</p>
+                    <span className="text-xs text-muted-foreground">Статус: PARTLY_PAID</span>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Клиент</TableHead>
+                        <TableHead>Питомец</TableHead>
+                        <TableHead>Всего</TableHead>
+                        <TableHead>Оплачено</TableHead>
+                        <TableHead>Остаток</TableHead>
+                        <TableHead className="text-right">Действия</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {waitingLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground">
+                            {t("common.loading")}
+                          </TableCell>
+                        </TableRow>
+                      ) : partlyCards.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground">
+                            {t("common.empty")}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        partlyCards.map((c: any) => (
+                          <TableRow key={`partly-${c.id}`}>
+                            <TableCell>{c.id}</TableCell>
+                            <TableCell>{c.client?.full_name ?? c.client_name ?? c.client ?? "—"}</TableCell>
+                            <TableCell>{c.pet?.name ?? c.pet_name ?? c.pet ?? "—"}</TableCell>
+                            <TableCell>{c.total_fee ?? c.total_amount ?? c.total ?? "—"}</TableCell>
+                            <TableCell>{c.amount_paid ?? "0"}</TableCell>
+                            <TableCell>{c.outstanding_fee ?? "0"}</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-2"
+                                onClick={() => setSelectedCard(c)}
+                              >
+                                {t("common.view")}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Clients list */}
+          <TabsContent value="clients" className="space-y-6 animate-fade-in">
+            <Card className="border-2">
+              <CardHeader>
+                <CardTitle>Клиенты</CardTitle>
+                <CardDescription>Список всех клиентов клиники</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid md:grid-cols-3 gap-3">
+                  <div>
+                    <Label htmlFor="clientFilterId">ID клиента</Label>
+                    <Input
+                      id="clientFilterId"
+                      value={clientFilterId}
+                      onChange={(e) => setClientFilterId(e.target.value)}
+                      placeholder="Например: 123"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="clientFilterName">Имя или фамилия</Label>
+                    <Input
+                      id="clientFilterName"
+                      value={clientFilterName}
+                      onChange={(e) => setClientFilterName(e.target.value)}
+                      placeholder="Имя или фамилия клиента"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="clientFilterPhone">Телефон</Label>
+                    <Input
+                      id="clientFilterPhone"
+                      value={clientFilterPhone}
+                      onChange={(e) => setClientFilterPhone(e.target.value)}
+                      placeholder="Поиск по телефону"
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-lg border overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Имя</TableHead>
+                        <TableHead>Фамилия</TableHead>
+                        <TableHead>Телефон</TableHead>
+                        <TableHead>Доп. телефон 1</TableHead>
+                        <TableHead>Доп. телефон 2</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clientsLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                            {t("common.loading")}
+                          </TableCell>
+                        </TableRow>
+                      ) : clientsPage.results.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
+                            Нет клиентов для отображения
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        clientsPage.results.map((c: any) => {
+                          const firstName = c.first_name || "---";
+                          const lastName = c.last_name || "---";
+                          const phone = c.phone_number || c.phone || "---";
+                          const extra1 = c.extra_phone_number1 || c.extra_number1 || "---";
+                          const extra2 = c.extra_phone_number2 || c.extra_number2 || "---";
+                          return (
+                            <TableRow key={c.id}>
+                              <TableCell>{c.id}</TableCell>
+                              <TableCell>{firstName}</TableCell>
+                              <TableCell>{lastName}</TableCell>
+                              <TableCell>{phone}</TableCell>
+                              <TableCell>{extra1}</TableCell>
+                              <TableCell>{extra2}</TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="flex justify-between">
+                  <Button
+                    variant="outline"
+                    disabled={!clientsPage.previous || clientsLoading}
+                    onClick={() => fetchClientsPageByUrl(clientsPage.previous)}
+                  >
+                    {t("common.prev")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={!clientsPage.next || clientsLoading}
+                    onClick={() => fetchClientsPageByUrl(clientsPage.next)}
+                  >
+                    {t("common.next")}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Add user (client) */}
+          <TabsContent value="addUser" className="space-y-6 animate-fade-in">
+            <Card className="border-2">
+              <CardHeader>
+                <CardTitle>Регистрация нового клиента</CardTitle>
+                <CardDescription>Создайте клиента, указав телефон и пароль. Имя и фамилия — необязательно.</CardDescription>
+              </CardHeader>
+              <AddClientForm />
             </Card>
           </TabsContent>
 
@@ -709,9 +1021,39 @@ const ModeratorDashboard = () => {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">{t("moderator.card.modal.total")}</p>
-                      <p className="font-semibold">{selectedCard?.total_amount ?? selectedCard?.total ?? "—"}</p>
+                      <p className="font-semibold">{selectedCard?.total_fee ?? selectedCard?.total_amount ?? selectedCard?.total ?? "—"}</p>
                     </div>
                   </div>
+
+                  {/* Payment summary */}
+                  {typeof selectedCard?.total_fee !== "undefined" && (
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      <div className="p-3 border rounded-lg bg-background">
+                        <p className="text-xs text-muted-foreground">Оплачено</p>
+                        <p className="font-semibold">{selectedCard?.amount_paid ?? "0"}</p>
+                      </div>
+                      <div className="p-3 border rounded-lg bg-background">
+                        <p className="text-xs text-muted-foreground">Остаток к оплате</p>
+                        <p className="font-semibold">{selectedCard?.outstanding_fee ?? "0"}</p>
+                      </div>
+                      <div className="p-3 border rounded-lg bg-background flex flex-col justify-between">
+                        <p className="text-xs text-muted-foreground mb-1">Прогресс оплаты</p>
+                        {(() => {
+                          const total = Number(selectedCard?.total_fee || selectedCard?.total_amount || 0);
+                          const paid = Number(selectedCard?.amount_paid || 0);
+                          const pct = total > 0 ? Math.min(100, Math.max(0, (paid / total) * 100)) : 0;
+                          return (
+                            <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
+                              <div
+                                className="h-2 bg-green-500 transition-all"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
 
                   {selectedCard?.anamnesis && (
                     <div>
@@ -821,31 +1163,199 @@ const ModeratorDashboard = () => {
                       </div>
                     )}
                   </div>
+
+                  {/* Payments list */}
+                  <div>
+                    <p className="text-sm font-semibold mb-2">Платежи ({payments.length})</p>
+                    {paymentsLoading ? (
+                      <p className="text-sm text-muted-foreground">Загрузка…</p>
+                    ) : payments.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Платежей пока нет</p>
+                    ) : (
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Дата</TableHead>
+                              <TableHead>Метод</TableHead>
+                              <TableHead>Сумма</TableHead>
+                              <TableHead>Комментарий</TableHead>
+                              <TableHead>Кем принят</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {payments.map((p: any, idx: number) => (
+                              <TableRow key={p.id ?? idx}>
+                                <TableCell>{p.created_at ? new Date(p.created_at).toLocaleString("ru-RU") : "—"}</TableCell>
+                                <TableCell>{p.method ?? "—"}</TableCell>
+                                <TableCell>{p.amount ?? "—"}</TableCell>
+                                <TableCell>{p.note ?? "—"}</TableCell>
+                                <TableCell>{p.recorded_by ?? "—"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button variant="outline" onClick={() => setSelectedCard(null)}>{t("common.close")}</Button>
-                  <Button
-                    onClick={async () => {
-                      if (!selectedCard?.id) return;
-                      setConfirmLoading(true);
-                      try {
-                        await MedicalCards.confirmPayment(selectedCard.id);
-                        toast({ title: t("common.confirmed") });
-                        setSelectedCard(null);
-                        await loadWaitingCards();
-                      } catch (e: any) {
-                        toast({ variant: "destructive", title: t("common.error"), description: e?.message || t("common.error") });
-                      } finally {
-                        setConfirmLoading(false);
-                      }
-                    }}
-                    disabled={confirmLoading}
-                    className="gap-2"
-                  >
-                    {confirmLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                    {t("common.confirmPayment")}
-                  </Button>
+                {/* Payment actions */}
+                <div className="space-y-4 pt-4 border-t mt-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="paymentAmount">Сумма платежа</Label>
+                      <Input
+                        id="paymentAmount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
+                        placeholder={selectedCard?.outstanding_fee ?? "0"}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Метод оплаты</Label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {["CASH", "CLICK", "PAYME", "OTHER"].map((m) => {
+                          const isActive = paymentMethod === m;
+                          const label =
+                            m === "CASH" ? "Наличные" : m === "CLICK" ? "Click" : m === "PAYME" ? "Payme" : "Другое";
+                          const imgSrc =
+                            m === "CASH"
+                              ? cashImg
+                              : m === "CLICK"
+                              ? clickImg
+                              : m === "PAYME"
+                              ? paymeImg
+                              : otherImg;
+                          return (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setPaymentMethod(m as any)}
+                              className={`flex flex-col items-center justify-center rounded-xl border p-3 transition hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                                isActive ? "border-primary bg-primary/5 shadow-sm" : "border-border"
+                              }`}
+                            >
+                              <img
+                                src={imgSrc}
+                                alt={label}
+                                className={`${m === "OTHER" ? "h-12 w-12" : "h-13 w-13"} object-contain`}
+                              />
+                              {m === "OTHER" && (
+                                <span className="mt-1 text-xs font-medium">{label}</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="paymentNote">Комментарий (необязательно)</Label>
+                      <Input
+                        id="paymentNote"
+                        value={paymentNote}
+                        onChange={(e) => setPaymentNote(e.target.value)}
+                        placeholder="Например: первая часть платежа"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between gap-2 flex-wrap">
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSelectedCard(null)}
+                      >
+                        {t("common.close")}
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={confirmLoading || !selectedCard?.id}
+                        onClick={async () => {
+                          if (!selectedCard?.id) return;
+                          setConfirmLoading(true);
+                          try {
+                            await MedicalCards.confirmPayment(selectedCard.id, {
+                              method: paymentMethod || undefined,
+                              note: paymentNote || undefined,
+                            });
+                            toast({ title: t("common.confirmed") });
+                            await loadWaitingCards();
+                            if (selectedCard?.id) {
+                              const updated = await MedicalCards.get<any>(selectedCard.id);
+                              setSelectedCard(updated);
+                              await loadPayments(Number(updated.id));
+                            }
+                          } catch (e: any) {
+                            const msg = e?.response?.data || e?.message || t("common.error");
+                            toast({ variant: "destructive", title: t("common.error"), description: JSON.stringify(msg) });
+                          } finally {
+                            setConfirmLoading(false);
+                          }
+                        }}
+                        className="gap-2"
+                      >
+                        {confirmLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                        Полностью оплачен
+                      </Button>
+                      <Button
+                        type="button"
+                        disabled={paymentSubmitting || !selectedCard?.id}
+                        className="gap-2"
+                        onClick={async () => {
+                          if (!selectedCard?.id) return;
+                          const amountNum = Number(paymentAmount);
+                          const outstanding = Number(selectedCard?.outstanding_fee ?? selectedCard?.total_fee ?? 0) - Number(selectedCard?.amount_paid ?? 0);
+                          if (!paymentAmount || isNaN(amountNum) || amountNum <= 0) {
+                            toast({ variant: "destructive", title: "Некорректная сумма", description: "Введите сумму больше нуля" });
+                            return;
+                          }
+                          if (amountNum > outstanding && outstanding > 0) {
+                            toast({ variant: "destructive", title: "Сумма больше остатка", description: `Максимум: ${outstanding}` });
+                            return;
+                          }
+                          if (!paymentMethod) {
+                            toast({ variant: "destructive", title: "Метод оплаты", description: "Выберите метод оплаты" });
+                            return;
+                          }
+                          setPaymentSubmitting(true);
+                          try {
+                            const updated = await MedicalCards.receivePayment<any>(selectedCard.id, {
+                              amount: amountNum.toFixed(2),
+                              method: paymentMethod,
+                              note: paymentNote || undefined,
+                            });
+                            setSelectedCard(updated);
+                            await loadWaitingCards();
+                            await loadPayments(Number(updated.id));
+                            setPaymentAmount("");
+                            toast({ title: "Платеж принят" });
+                          } catch (e: any) {
+                            const data = e?.response?.data;
+                            let msg = e?.message || t("common.error");
+                            if (data && typeof data === "object") {
+                              msg = Object.values(data as any).flat().join("; ");
+                            }
+                            toast({ variant: "destructive", title: "Ошибка оплаты", description: msg });
+                          } finally {
+                            setPaymentSubmitting(false);
+                          }
+                        }}
+                      >
+                        {paymentSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                        Принять частичный платеж
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>
@@ -857,3 +1367,165 @@ const ModeratorDashboard = () => {
 };
 
 export default ModeratorDashboard;
+
+// --- Local AddClientForm component ---
+
+const AddClientForm = () => {
+  const { toast } = useToast();
+  const [form, setForm] = useState({
+    phone_number: "",
+    password: "",
+    first_name: "",
+    last_name: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [usedPhones, setUsedPhones] = useState<Set<string> | null>(null);
+  const [checkingPhone, setCheckingPhone] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Basic regex for +998 XX XXX XX XX style numbers (at least country code + digits)
+  const phoneRegex = /^\+?\d{9,15}$/;
+
+  // Load used phones once (and refreshable if needed) when form mounts
+  useEffect(() => {
+    let cancelled = false;
+    const loadUsed = async () => {
+      try {
+        setCheckingPhone(true);
+        const data = await Utils.usedPhones();
+        if (!cancelled) {
+          setUsedPhones(new Set(data.results || []));
+        }
+      } catch {
+        // If this fails, we still allow registration; just skip uniqueness check
+      } finally {
+        if (!cancelled) setCheckingPhone(false);
+      }
+    };
+    void loadUsed();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const validatePhone = (value: string) => {
+    if (!phoneRegex.test(value)) {
+      setPhoneError("Неверный формат телефона");
+      return false;
+    }
+    if (usedPhones && usedPhones.has(value)) {
+      setPhoneError("Этот номер уже используется");
+      return false;
+    }
+    setPhoneError(null);
+    return true;
+  };
+
+  const onSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!form.phone_number || !form.password) {
+      toast({ variant: "destructive", title: "Проверьте поля", description: "Телефон и пароль обязательны" });
+      return;
+    }
+    if (!validatePhone(form.phone_number)) {
+      toast({ variant: "destructive", title: "Телефон некорректен", description: phoneError ?? "Проверьте номер телефона" });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const payload: Record<string, unknown> = {
+        phone_number: form.phone_number,
+        password: form.password,
+        role: "CLIENT",
+      };
+      if (form.first_name) payload.first_name = form.first_name;
+      if (form.last_name) payload.last_name = form.last_name;
+      const created = await Clients.create<any>(payload);
+      toast({ title: "Клиент создан", description: `ID: ${created?.id ?? "—"}` });
+  setForm({ phone_number: "", password: "", first_name: "", last_name: "" });
+  setPhoneError(null);
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || e?.message || "Не удалось создать клиента";
+      toast({ variant: "destructive", title: "Ошибка", description: String(msg) });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <CardContent>
+      <form className="space-y-4" onSubmit={onSubmit}>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="phone_number">Телефон</Label>
+            <Input
+              id="phone_number"
+              placeholder="+998901234567"
+              value={form.phone_number}
+              onChange={(e) => {
+                const value = e.target.value;
+                setForm((s) => ({ ...s, phone_number: value }));
+                if (value) validatePhone(value);
+              }}
+              className={phoneError ? "border-red-500 focus-visible:ring-red-500" : undefined}
+              required
+            />
+            {checkingPhone && !usedPhones && (
+              <p className="text-xs text-muted-foreground">Проверка номера…</p>
+            )}
+            {phoneError && (
+              <p className="text-xs text-red-500">{phoneError}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Пароль</Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Минимум 6 символов"
+                value={form.password}
+                onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))}
+                required
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="first_name">Имя (необязательно)</Label>
+            <Input
+              id="first_name"
+              value={form.first_name}
+              onChange={(e) => setForm((s) => ({ ...s, first_name: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="last_name">Фамилия (необязательно)</Label>
+            <Input
+              id="last_name"
+              value={form.last_name}
+              onChange={(e) => setForm((s) => ({ ...s, last_name: e.target.value }))}
+            />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button type="submit" disabled={submitting} className="gap-2">
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            Создать клиента
+          </Button>
+        </div>
+      </form>
+    </CardContent>
+  );
+};
