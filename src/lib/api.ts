@@ -116,6 +116,18 @@ export const MedicalCards = {
     const { data } = await api.get<T>("medical-cards/partly-paid/");
     return data;
   },
+  attachments: {
+    list: async <T = any>(cardId: ID) => {
+      const { data } = await api.get<T | T[]>(`medical-cards/${cardId}/attachments/`);
+      return data as any;
+    },
+    upload: async <T = any>(cardId: ID, formData: FormData) => {
+      const { data } = await api.post<T | T[]>(`medical-cards/${cardId}/attachments/`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      } as any);
+      return data as any;
+    },
+  },
   create: <T = unknown>(body: Record<string, unknown>) => post<T>("medical-cards/", body),
   update: <T = unknown>(id: ID, body: Record<string, unknown>) => put<T>("medical-cards/", id, body),
   patch: <T = unknown>(id: ID, body: Record<string, unknown>) => patch<T>("medical-cards/", id, body),

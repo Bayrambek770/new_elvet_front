@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Heart, LogOut, FileText, Users, Calendar, Clock, RefreshCcw, Package, Pill, BedDouble, User, Image as ImageIcon, Stethoscope } from "lucide-react";
+import { Heart, LogOut, FileText, Users, Calendar, Clock, RefreshCcw, Package, Pill, BedDouble, User, Image as ImageIcon, Stethoscope, Paperclip, Download, ExternalLink } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -81,6 +81,7 @@ const DoctorDashboard = () => {
   interface ApiFeed { id: number; feed_name?: string; name?: string; price?: string | number }
   interface ApiRoom { id: number; room_number: string; price_per_day?: string; description?: string; is_available: boolean }
   interface ApiMedicalCard { id: number; pet?: number | string; doctor?: number; client?: number; diagnosis?: string; created_at?: string; status?: string; closed_at?: string; total_fee?: string; service_usages?: any[]; analyze?: string; general_condition?: string; chest_condition?: string; notes?: string; revisit_date?: string | null; stationary_room?: number | null; stay_start?: string | null; stay_end?: string | null }
+  interface ApiMedicalCardAttachment { id: number; medical_card?: number; type?: "XRAY" | "PRESCRIPTION" | "OTHER" | string; file: string; uploaded_by?: number; uploaded_at?: string }
   interface ApiServiceUsage { id: number; medical_card: number; service: number; service_name?: string; quantity: number; description?: string }
   interface ApiMedicineUsage { id: number; medical_card: number; medicine: number; name?: string; quantity: number; dosage: string }
   interface ApiFeedUsage { id: number; medical_card: number; feed: number; quantity: number }
@@ -248,6 +249,12 @@ const DoctorDashboard = () => {
   const [editFeedsUsages, setEditFeedsUsages] = useState<EditFeedUsageRow[]>([]);
   const [editUsagesLoading, setEditUsagesLoading] = useState(false);
   const [editUsagesError, setEditUsagesError] = useState<string | null>(null);
+  const [editAttachments, setEditAttachments] = useState<ApiMedicalCardAttachment[]>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<{ file: File; type: "XRAY" | "PRESCRIPTION" | "OTHER" }[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [attachmentsUploading, setAttachmentsUploading] = useState(false);
+  // Create card attachments state
+  const [newCardAttachments, setNewCardAttachments] = useState<{ file: File; type: "XRAY" | "PRESCRIPTION" | "OTHER" }[]>([]);
   // Edit catalogs for adding new rows
   const [editFormServices, setEditFormServices] = useState<Paginated<ApiService> | null>(null);
   const [editFormMedicines, setEditFormMedicines] = useState<Paginated<ApiMedicine> | null>(null);
@@ -263,7 +270,7 @@ const DoctorDashboard = () => {
     setEditOriginal(null);
     try {
       const { data } = await api.get(`medical-cards/${id}/`);
-      const card = data as ApiMedicalCard;
+      const card = data as ApiMedicalCard & { attachments?: ApiMedicalCardAttachment[] };
       setEditOriginal(card);
       setEditDiagnosis(card.diagnosis || "");
       setEditAnalyses(card.analyze || "");
@@ -271,6 +278,8 @@ const DoctorDashboard = () => {
       setEditChest(card.chest_condition || "");
       setEditNotes(card.notes || "");
       setEditRevisit(card.revisit_date ? (card.revisit_date as string).slice(0,10) : "");
+      setEditAttachments(card.attachments || []);
+      setPendingAttachments([]);
       const hasStationary = Boolean(card.stationary_room || card.stay_start || card.stay_end);
       setEditIsStationary(hasStationary);
       setEditStationaryRoom(card.stationary_room ? String(card.stationary_room) : "");
@@ -415,6 +424,28 @@ const DoctorDashboard = () => {
           if (Object.keys(payload).length > 0) {
             try { await api.patch(`medicine-usages/${row.id}/`, payload); } catch {}
           }
+        }
+      }
+
+      // 3) Upload pending attachments if any
+      if (pendingAttachments.length && editCardId) {
+        try {
+          setAttachmentsUploading(true);
+          const form = new FormData();
+          for (const att of pendingAttachments) {
+            form.append("files", att.file);
+            form.append("types", att.type);
+          }
+          const { data } = await api.post(`medical-cards/${editCardId}/attachments/`, form, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+          const created = Array.isArray(data) ? data as any[] : [data];
+          setEditAttachments(prev => [...prev, ...created as any]);
+          setPendingAttachments([]);
+        } catch (e:any) {
+          toast({ title: t('doctor.edit.attachments.uploadError', { defaultValue: 'Не удалось загрузить вложения' }), description: e?.message, variant: 'destructive' });
+        } finally {
+          setAttachmentsUploading(false);
         }
       }
 
@@ -818,8 +849,6 @@ const DoctorDashboard = () => {
     if (missing.length) { toast({ title: t('doctor.create.validation.requiredFieldsTitle'), description: missing.join(', '), variant: 'destructive' }); return; }
     const selectedServiceEntries = Object.entries(selectedServices);
     const selectedMedicineEntries = Object.entries(selectedMedicines);
-    if (selectedServiceEntries.length === 0 && selectedMedicineEntries.length === 0 && Object.keys(selectedFeeds).length === 0) {
-      toast({ title: t('doctor.create.validation.selectItems'), variant: "destructive" }); return; }
 
     const medicinesMissingDosage = selectedMedicineEntries.filter(([, v]) => !v.dosage.trim());
     if (medicinesMissingDosage.length) {
@@ -1885,6 +1914,110 @@ const DoctorDashboard = () => {
                         <Label htmlFor="revisit">{t('doctor.revisitDate')}</Label>
                         <Input id="revisit" type="date" min={todayStr} value={revisitDate} onChange={(e) => setRevisitDate(e.target.value)} />
                       </div>
+
+                      {/* Attachments upload area (X-rays & prescriptions) */}
+                      <div className="md:col-span-2 mt-4">
+                        <div
+                          className="relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-sky-500 via-indigo-500 to-fuchsia-500 p-[1px] shadow-lg shadow-sky-500/20"
+                        >
+                          <div
+                            className="flex flex-col items-center justify-center gap-3 rounded-[10px] border border-dashed border-white/30 bg-slate-950/70 px-8 py-8 text-center transition-colors duration-200 hover:bg-slate-950/90 cursor-pointer"
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const files = Array.from(e.dataTransfer.files || []);
+                              if (!files.length) return;
+                              setNewCardAttachments(prev => ([
+                                ...prev,
+                                ...files.map(file => {
+                                  const lower = file.name.toLowerCase();
+                                  let type: "XRAY" | "PRESCRIPTION" | "OTHER" = "OTHER";
+                                  if (lower.endsWith('.pdf')) {
+                                    type = "PRESCRIPTION";
+                                  } else if (/\.(jpg|jpeg|png|gif|bmp|tiff|tif|dcm)$/.test(lower)) {
+                                    type = "XRAY";
+                                  }
+                                  return { file, type };
+                                }),
+                              ]));
+                            }}
+                            >
+                            <label className="flex flex-col items-center gap-3">
+                              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-500/20 text-sky-300 ring-2 ring-sky-400/60 ring-offset-2 ring-offset-slate-950 shadow-inner animate-pulse">
+                                <span className="text-4xl leading-none">+</span>
+                              </div>
+                              <input
+                                type="file"
+                                className="hidden"
+                                multiple
+                                accept="image/*,.pdf,.dcm,.dicom"
+                                onChange={(e) => {
+                                  const files = Array.from(e.target.files || []);
+                                  if (!files.length) return;
+                                  setNewCardAttachments(prev => ([
+                                    ...prev,
+                                    ...files.map(file => {
+                                      const lower = file.name.toLowerCase();
+                                      let type: "XRAY" | "PRESCRIPTION" | "OTHER" = "OTHER";
+                                      if (lower.endsWith('.pdf')) {
+                                        type = "PRESCRIPTION";
+                                      } else if (/\.(jpg|jpeg|png|gif|bmp|tiff|tif|dcm)$/.test(lower)) {
+                                        type = "XRAY";
+                                      }
+                                      return { file, type };
+                                    }),
+                                  ]));
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                        {newCardAttachments.length > 0 && (
+                          <div className="mt-2 space-y-2">
+                            <div className="max-h-32 space-y-1 overflow-y-auto rounded-md bg-slate-900/70 p-2 text-xs">
+                              {newCardAttachments.map((att, idx) => (
+                                <div key={`${att.file.name}-${idx}`} className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[9px] font-semibold text-primary">
+                                      {att.type === 'XRAY' ? 'X' : att.type === 'PRESCRIPTION' ? 'Rx' : 'F'}
+                                    </span>
+                                    <span className="max-w-[150px] truncate" title={att.file.name}>{att.file.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Select
+                                      value={att.type}
+                                      onValueChange={(v) => setNewCardAttachments(prev => prev.map((x, i) => i === idx ? { ...x, type: v as any } : x))}
+                                    >
+                                      <SelectTrigger className="h-7 w-[110px] text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="XRAY">XRAY</SelectItem>
+                                        <SelectItem value="PRESCRIPTION">PRESCRIPTION</SelectItem>
+                                        <SelectItem value="OTHER">OTHER</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-xs"
+                                      onClick={() => setNewCardAttachments(prev => prev.filter((_, i) => i !== idx))}
+                                    >
+                                      ×
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
 
@@ -2649,6 +2782,167 @@ const DoctorDashboard = () => {
                           </div>
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Attachments: X-rays & Prescriptions */}
+                <div className="md:col-span-2">
+                  <Card className="border-2">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2"><Paperclip className="w-4 h-4" />{t('doctor.edit.attachments.title', { defaultValue: 'Вложения: рентген и назначения' })}</CardTitle>
+                      <CardDescription>{t('doctor.edit.attachments.subtitle', { defaultValue: 'Загрузите снимки и PDF-файлы рецептов для этой карты' })}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="attachments-input">{t('doctor.edit.attachments.add', { defaultValue: 'Добавить вложения' })}</Label>
+                        <Input
+                          id="attachments-input"
+                          type="file"
+                          multiple
+                          accept="image/*,.pdf,.dcm,.dicom"
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []);
+                            if (!files.length) return;
+                            setPendingAttachments(prev => ([
+                              ...prev,
+                              ...files.map(file => {
+                                const lower = file.name.toLowerCase();
+                                let type: "XRAY" | "PRESCRIPTION" | "OTHER" = "OTHER";
+                                if (lower.endsWith('.pdf')) {
+                                  type = "PRESCRIPTION";
+                                } else if (/\.(jpg|jpeg|png|gif|bmp|tiff|tif|dcm)$/.test(lower)) {
+                                  type = "XRAY";
+                                }
+                                return { file, type };
+                              }),
+                            ]));
+                            e.target.value = '';
+                          }}
+                        />
+                        {pendingAttachments.length > 0 && (
+                          <div className="mt-2 space-y-2">
+                            <p className="text-xs text-muted-foreground">{t('doctor.edit.attachments.pending', { defaultValue: 'Файлы, ожидающие загрузки' })}</p>
+                            <div className="space-y-2 max-h-40 overflow-y-auto border rounded-md p-2 bg-muted/40">
+                              {pendingAttachments.map((att, idx) => (
+                                <div key={`${att.file.name}-${idx}`} className="flex items-center justify-between gap-2 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                                      {att.type === 'XRAY' ? 'X' : att.type === 'PRESCRIPTION' ? 'Rx' : 'F'}
+                                    </span>
+                                    <span className="truncate max-w-[180px]" title={att.file.name}>{att.file.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Select
+                                      value={att.type}
+                                      onValueChange={(v) => setPendingAttachments(prev => prev.map((x, i) => i === idx ? { ...x, type: v as any } : x))}
+                                    >
+                                      <SelectTrigger className="h-7 w-[120px] text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="XRAY">XRAY</SelectItem>
+                                        <SelectItem value="PRESCRIPTION">PRESCRIPTION</SelectItem>
+                                        <SelectItem value="OTHER">OTHER</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-xs"
+                                      onClick={() => setPendingAttachments(prev => prev.filter((_, i) => i !== idx))}
+                                    >
+                                      ×
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              {t('doctor.edit.attachments.hint', { defaultValue: 'Вложения будут загружены при сохранении карты.' })}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium flex items-center gap-2">
+                            🖼️ {t('doctor.edit.attachments.xrayTitle', { defaultValue: 'Рентген-снимки' })}
+                          </p>
+                          {attachmentsLoading && <span className="text-xs text-muted-foreground">{t('common.loading')}</span>}
+                        </div>
+                        {editAttachments.filter(a => (a.type || '').toUpperCase() === 'XRAY').length === 0 ? (
+                          <p className="text-xs text-muted-foreground">{t('doctor.edit.attachments.xrayEmpty', { defaultValue: 'Нет загруженных рентген-снимков' })}</p>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {editAttachments.filter(a => (a.type || '').toUpperCase() === 'XRAY').map(att => (
+                              <div key={att.id} className="relative group rounded-lg overflow-hidden border bg-muted/40">
+                                <img src={att.file} alt="xray" className="w-full h-28 object-cover" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+                                  <a
+                                    href={att.file}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-xs text-white px-2 py-1 rounded-full bg-black/60"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    {t('doctor.edit.attachments.open', { defaultValue: 'Открыть' })}
+                                  </a>
+                                  <a
+                                    href={att.file}
+                                    download
+                                    className="inline-flex items-center gap-1 text-xs text-white px-2 py-1 rounded-full bg-black/60"
+                                  >
+                                    <Download className="w-3 h-3" />
+                                    {t('doctor.edit.attachments.download', { defaultValue: 'Скачать' })}
+                                  </a>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        <p className="text-sm font-medium flex items-center gap-2">
+                          📄 {t('doctor.edit.attachments.prescriptionsTitle', { defaultValue: 'PDF назначения' })}
+                        </p>
+                        {editAttachments.filter(a => (a.type || '').toUpperCase() === 'PRESCRIPTION').length === 0 ? (
+                          <p className="text-xs text-muted-foreground">{t('doctor.edit.attachments.prescriptionsEmpty', { defaultValue: 'Нет загруженных PDF-файлов' })}</p>
+                        ) : (
+                          <div className="space-y-1 max-h-40 overflow-y-auto">
+                            {editAttachments.filter(a => (a.type || '').toUpperCase() === 'PRESCRIPTION').map((att, idx) => (
+                              <div key={att.id ?? idx} className="flex items-center justify-between gap-2 text-xs border rounded-md px-2 py-1 bg-muted/40">
+                                <div className="flex items-center gap-2 truncate">
+                                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-[10px] font-semibold text-amber-800">Rx</span>
+                                  <span className="truncate max-w-[220px]" title={att.file}>{att.file.split('/').slice(-1)[0]}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <a
+                                    href={att.file}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] text-sky-700 hover:underline"
+                                  >
+                                    <ExternalLink className="w-3 h-3" />
+                                    {t('doctor.edit.attachments.open', { defaultValue: 'Открыть' })}
+                                  </a>
+                                  <a
+                                    href={att.file}
+                                    download
+                                    className="inline-flex items-center gap-1 text-[11px] text-emerald-700 hover:underline"
+                                  >
+                                    <Download className="w-3 h-3" />
+                                    {t('doctor.edit.attachments.download', { defaultValue: 'Скачать' })}
+                                  </a>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 </div>

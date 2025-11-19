@@ -86,7 +86,7 @@ console.log(me);
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-6 space-y-6">
         {/* Hero Welcome Card */}
         <Card className="overflow-hidden border-0 shadow-elegant animate-fade-in">
           <div className="bg-gradient-hero p-8 text-primary-foreground relative">
@@ -115,11 +115,11 @@ console.log(me);
         </Card>
 
         {/* Enhanced Tabs */}
-        <Tabs defaultValue="pets" className="space-y-6">
-          <TabsList className="bg-card shadow-md border p-1.5 h-auto grid grid-cols-2 lg:grid-cols-3 gap-2">
+        <Tabs defaultValue="pets" className="space-y-5">
+          <TabsList className="bg-card/80 shadow-md border p-1.5 h-auto grid grid-cols-3 gap-2 rounded-2xl backdrop-blur-sm">
             <TabsTrigger 
               value="pets" 
-              className="flex items-center gap-2 data-[state=active]:bg-gradient-hero data-[state=active]:text-primary-foreground data-[state=active]:shadow-md py-3 transition-all"
+              className="flex items-center gap-2 rounded-xl py-3 px-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-emerald-500/40 data-[state=inactive]:hover:bg-muted/60 transition-all"
             >
               <PawPrint className="w-5 h-5" />
               <span className="hidden sm:inline">{t("dashboard.myPets")}</span>
@@ -127,7 +127,7 @@ console.log(me);
             </TabsTrigger>
             <TabsTrigger 
               value="cards" 
-              className="flex items-center gap-2 data-[state=active]:bg-gradient-hero data-[state=active]:text-primary-foreground data-[state=active]:shadow-md py-3 transition-all"
+              className="flex items-center gap-2 rounded-xl py-3 px-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-sky-500/40 data-[state=inactive]:hover:bg-muted/60 transition-all"
             >
               <FileText className="w-5 h-5" />
               <span className="hidden sm:inline">{t("dashboard.medicalHistory")}</span>
@@ -135,7 +135,7 @@ console.log(me);
             </TabsTrigger>
             <TabsTrigger 
               value="profile" 
-              className="flex items-center gap-2 data-[state=active]:bg-gradient-hero data-[state=active]:text-primary-foreground data-[state=active]:shadow-md py-3 transition-all"
+              className="flex items-center gap-2 rounded-xl py-3 px-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-fuchsia-500 data-[state=active]:to-pink-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-pink-500/40 data-[state=inactive]:hover:bg-muted/60 transition-all"
             >
               <User className="w-5 h-5" />
               <span className="hidden sm:inline">{t("dashboard.profile")}</span>
@@ -143,15 +143,15 @@ console.log(me);
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="pets" className="space-y-6 animate-fade-in">
+          <TabsContent value="pets" className="space-y-5 animate-fade-in">
             {me && <PetsManager userId={String(me.id)} role={me.role ?? "CLIENT"} />}
           </TabsContent>
 
-          <TabsContent value="cards" className="space-y-6 animate-fade-in">
+          <TabsContent value="cards" className="space-y-5 animate-fade-in">
             {me && <MedicalCardsViewer userId={String(me.id)} />}
           </TabsContent>
 
-          <TabsContent value="profile" className="space-y-6 animate-fade-in">
+          <TabsContent value="profile" className="space-y-5 animate-fade-in">
             <ProfileEditor user={me} />
           </TabsContent>
         </Tabs>

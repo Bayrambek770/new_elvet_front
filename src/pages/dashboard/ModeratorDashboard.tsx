@@ -573,26 +573,26 @@ const ModeratorDashboard = () => {
 
         {/* KPI Grid */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in">
+          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-emerald-50 to-transparent">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{t("moderator.kpi.medicinesAvailable")}</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">💊 {t("moderator.kpi.medicinesAvailable")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">{kpis.medicinesAvailable}</div>
               <p className="text-xs text-muted-foreground mt-1">quantity &gt; 0</p>
             </CardContent>
           </Card>
-          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in">
+          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-sky-50 to-transparent">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{t("moderator.kpi.servicesCount")}</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">🛠️ {t("moderator.kpi.servicesCount")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">{kpis.servicesCount}</div>
             </CardContent>
           </Card>
-          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in">
+          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-fuchsia-50 to-transparent">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{t("moderator.kpi.visitsCount")}</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">📅 {t("moderator.kpi.visitsCount")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">{kpis.visitsCount}</div>
@@ -602,12 +602,27 @@ const ModeratorDashboard = () => {
 
         {/* Dashboard Tabs */}
         <Tabs defaultValue="medicalCards" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8 h-auto p-1">
-            <TabsTrigger value="medicalCards" className="gap-2 py-3">{t("dashboard.medicalCards")}</TabsTrigger>
-            <TabsTrigger value="visits" className="gap-2 py-3">{t("moderator.tabs.visits")}</TabsTrigger>
-            <TabsTrigger value="requests" className="gap-2 py-3">{t("moderator.tabs.requests")}</TabsTrigger>
-            <TabsTrigger value="clients" className="gap-2 py-3">Клиенты</TabsTrigger>
-            <TabsTrigger value="addUser" className="gap-2 py-3">Добавить пользователя</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-5 mb-8 h-auto p-1 rounded-xl border bg-muted/40">
+            <TabsTrigger value="medicalCards" className="gap-2 py-3 rounded-lg transition data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">
+              <span>🧾</span>
+              {t("dashboard.medicalCards")}
+            </TabsTrigger>
+            <TabsTrigger value="visits" className="gap-2 py-3 rounded-lg transition data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 hover:bg-muted">
+              <span>📅</span>
+              {t("moderator.tabs.visits")}
+            </TabsTrigger>
+            <TabsTrigger value="requests" className="gap-2 py-3 rounded-lg transition data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 hover:bg-muted">
+              <span>📥</span>
+              {t("moderator.tabs.requests")}
+            </TabsTrigger>
+            <TabsTrigger value="clients" className="gap-2 py-3 rounded-lg transition data-[state=active]:bg-sky-100 data-[state=active]:text-sky-700 hover:bg-muted">
+              <span>👥</span>
+              Клиенты
+            </TabsTrigger>
+            <TabsTrigger value="addUser" className="gap-2 py-3 rounded-lg transition data-[state=active]:bg-fuchsia-100 data-[state=active]:text-fuchsia-700 hover:bg-muted">
+              <span>➕</span>
+              Добавить пользователя
+            </TabsTrigger>
           </TabsList>
 
           {/* Medical Cards: Waiting for Payment */}
