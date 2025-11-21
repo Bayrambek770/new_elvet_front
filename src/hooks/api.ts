@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Auth, Clients, MedicalCards, Schedules, ServiceUsages, Payments, Me, type MeResponse } from "@/lib/api";
+import { Auth, Clients, MedicalCards, Schedules, ServiceUsages, Payments, Me, NurseCareCards, type MeResponse } from "@/lib/api";
 import { api, tokenStore } from "@/lib/apiClient";
 
 export const useLogin = () =>
@@ -93,6 +93,47 @@ export const useUpdateMyImage = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["me"] });
+    },
+  });
+};
+
+// Nurse Care Cards hooks
+export const useNurseCareMine = () =>
+  useQuery({
+    queryKey: ["nurseCareCards", "mine"],
+    queryFn: async () => NurseCareCards.mine(),
+  });
+
+export const useNurseCareClient = () =>
+  useQuery({
+    queryKey: ["nurseCareCards", "client"],
+    queryFn: async () => NurseCareCards.client(),
+  });
+
+export const useCreateNurseCareCard = () =>
+  useMutation({
+    mutationFn: (payload: { nurse: number | string; client: number | string; pet: number | string; description?: string; service_ids?: Array<number | string>; created_by?: number | string }) =>
+      NurseCareCards.create(payload),
+  });
+
+export const useUpdateNurseCareInfo = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number | string; payload: { description?: string; service_ids?: Array<number | string> } }) =>
+      NurseCareCards.updateInfo(id, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["nurseCareCards"] });
+    },
+  });
+};
+
+export const useRecordNurseCarePayment = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, amount_paid, method }: { id: number | string; amount_paid: string; method: "CASH" | "CLICK" | "PAYME" | "OTHER" }) =>
+      NurseCareCards.recordPayment(id, { amount_paid, method }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["nurseCareCards"] });
     },
   });
 };

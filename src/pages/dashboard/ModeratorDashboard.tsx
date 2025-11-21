@@ -26,6 +26,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { MedicalCards, Medicines, Services, Pets, Visits, Requests as RequestsApi, ServiceUsages, MedicineUsages, Clients, Doctors, Utils, PaymentTransactions } from "@/lib/api";
+import { ModeratorNurseCareCardsManager } from "@/components/moderator/NurseCareCardsManager";
 import elvetLogo from "@/assets/elvet_logo.jpg";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -602,26 +603,51 @@ const ModeratorDashboard = () => {
 
         {/* Dashboard Tabs */}
         <Tabs defaultValue="medicalCards" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8 h-auto p-1 rounded-xl border bg-muted/40">
-            <TabsTrigger value="medicalCards" className="gap-2 py-3 rounded-lg transition data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted">
-              <span>🧾</span>
-              {t("dashboard.medicalCards")}
+          <TabsList className="w-full mb-8 h-auto p-1 rounded-xl border bg-muted/40 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {/* First row */}
+            <TabsTrigger
+              value="medicalCards"
+              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted"
+            >
+              <span className="flex-shrink-0">🧾</span>
+              <span className="truncate">{t("dashboard.medicalCards")}</span>
             </TabsTrigger>
-            <TabsTrigger value="visits" className="gap-2 py-3 rounded-lg transition data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 hover:bg-muted">
-              <span>📅</span>
-              {t("moderator.tabs.visits")}
+            <TabsTrigger
+              value="visits"
+              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 hover:bg-muted"
+            >
+              <span className="flex-shrink-0">📅</span>
+              <span className="truncate">{t("moderator.tabs.visits")}</span>
             </TabsTrigger>
-            <TabsTrigger value="requests" className="gap-2 py-3 rounded-lg transition data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 hover:bg-muted">
-              <span>📥</span>
-              {t("moderator.tabs.requests")}
+            <TabsTrigger
+              value="requests"
+              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 hover:bg-muted"
+            >
+              <span className="flex-shrink-0">📥</span>
+              <span className="truncate">{t("moderator.tabs.requests")}</span>
             </TabsTrigger>
-            <TabsTrigger value="clients" className="gap-2 py-3 rounded-lg transition data-[state=active]:bg-sky-100 data-[state=active]:text-sky-700 hover:bg-muted">
-              <span>👥</span>
-              Клиенты
+
+            {/* Second row */}
+            <TabsTrigger
+              value="clients"
+              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-sky-100 data-[state=active]:text-sky-700 hover:bg-muted"
+            >
+              <span className="flex-shrink-0">👥</span>
+              <span className="truncate">Клиенты</span>
             </TabsTrigger>
-            <TabsTrigger value="addUser" className="gap-2 py-3 rounded-lg transition data-[state=active]:bg-fuchsia-100 data-[state=active]:text-fuchsia-700 hover:bg-muted">
-              <span>➕</span>
-              Добавить пользователя
+            <TabsTrigger
+              value="addUser"
+              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-fuchsia-100 data-[state=active]:text-fuchsia-700 hover:bg-muted"
+            >
+              <span className="flex-shrink-0">➕</span>
+              <span className="truncate">Добавить пользователя</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="nurseCare"
+              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 hover:bg-muted"
+            >
+              <span className="flex-shrink-0">🩺</span>
+              <span className="truncate">Nurse Care</span>
             </TabsTrigger>
           </TabsList>
 
@@ -733,6 +759,10 @@ const ModeratorDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="nurseCare" className="space-y-6 animate-fade-in">
+            <ModeratorNurseCareCardsManager />
           </TabsContent>
 
           {/* Clients list */}

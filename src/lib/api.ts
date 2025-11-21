@@ -287,3 +287,49 @@ export const Utils = {
     return data;
   },
 };
+
+// Nurse Care Cards
+export type NurseCareServiceSnapshot = {
+  id: number;
+  service: number;
+  service_name: string;
+  price: string; // decimal as string
+  nurse_share_percent?: string;
+  created_at?: string;
+};
+
+export type NurseCareCard = {
+  id: number;
+  created_by: number;
+  nurse: number;
+  client: number;
+  pet: number;
+  description: string | null;
+  status: "WAITING_FOR_PAYMENT" | "PARTLY_PAID" | "FULLY_PAID" | string;
+  total_amount: string; // decimal as string
+  amount_paid: string; // decimal as string
+  last_payment_method?: "CASH" | "CLICK" | "PAYME" | "OTHER" | null | string;
+  created_at?: string;
+  updated_at?: string;
+  services: NurseCareServiceSnapshot[];
+};
+
+export const NurseCareCards = {
+  list: <T = NurseCareCard[]>(params?: Record<string, unknown>) => list<T>("nurse-care-cards/", params),
+  get: <T = NurseCareCard>(id: ID) => get<T>("nurse-care-cards/", id),
+  create: <T = NurseCareCard>(body: {
+    nurse: ID;
+    client: ID;
+    pet: ID;
+    description?: string;
+    service_ids?: ID[];
+  }) => post<T>("nurse-care-cards/", body),
+  mine: async <T = NurseCareCard[]>() => (await api.get<T>("nurse-care-cards/mine/")).data,
+  client: async <T = NurseCareCard[]>() => (await api.get<T>("nurse-care-cards/client/")).data,
+  updateInfo: async <T = NurseCareCard>(id: ID, body: { description?: string; service_ids?: ID[] }) =>
+    (await api.patch<T>(`nurse-care-cards/${id}/info/`, body)).data,
+  recordPayment: async <T = NurseCareCard>(
+    id: ID,
+    body: { amount_paid: string; method: "CASH" | "CLICK" | "PAYME" | "OTHER" }
+  ) => (await api.patch<T>(`nurse-care-cards/${id}/payment/`, body)).data,
+};

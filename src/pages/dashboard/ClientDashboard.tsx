@@ -10,6 +10,7 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { PetsManager } from "@/components/client/PetsManager";
 import { AppointmentsManager } from "@/components/client/AppointmentsManager";
 import { MedicalCardsViewer } from "@/components/client/MedicalCardsViewer";
+import { NurseCareCardsViewer } from "@/components/client/NurseCareCardsViewer";
 import { ProfileEditor } from "@/components/client/ProfileEditor";
 import { useMe } from "@/hooks/api";
 import { tokenStore } from "@/lib/apiClient";
@@ -116,7 +117,7 @@ console.log(me);
 
         {/* Enhanced Tabs */}
         <Tabs defaultValue="pets" className="space-y-5">
-          <TabsList className="bg-card/80 shadow-md border p-1.5 h-auto grid grid-cols-3 gap-2 rounded-2xl backdrop-blur-sm">
+          <TabsList className="bg-card/80 shadow-md border p-1.5 h-auto grid grid-cols-4 gap-2 rounded-2xl backdrop-blur-sm">
             <TabsTrigger 
               value="pets" 
               className="flex items-center gap-2 rounded-xl py-3 px-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-emerald-500/40 data-[state=inactive]:hover:bg-muted/60 transition-all"
@@ -134,6 +135,14 @@ console.log(me);
               <span className="sm:hidden">{t("dashboard.medicalHistoryShort")}</span>
             </TabsTrigger>
             <TabsTrigger 
+              value="nurse-care" 
+              className="flex items-center gap-2 rounded-xl py-3 px-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-amber-500/40 data-[state=inactive]:hover:bg-muted/60 transition-all"
+            >
+              <FileText className="w-5 h-5" />
+              <span className="hidden sm:inline">Nurse Care</span>
+              <span className="sm:hidden">Nurse</span>
+            </TabsTrigger>
+            <TabsTrigger 
               value="profile" 
               className="flex items-center gap-2 rounded-xl py-3 px-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-fuchsia-500 data-[state=active]:to-pink-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-pink-500/40 data-[state=inactive]:hover:bg-muted/60 transition-all"
             >
@@ -149,6 +158,10 @@ console.log(me);
 
           <TabsContent value="cards" className="space-y-5 animate-fade-in">
             {me && <MedicalCardsViewer userId={String(me.id)} />}
+          </TabsContent>
+
+          <TabsContent value="nurse-care" className="space-y-5 animate-fade-in">
+            <NurseCareCardsViewer />
           </TabsContent>
 
           <TabsContent value="profile" className="space-y-5 animate-fade-in">

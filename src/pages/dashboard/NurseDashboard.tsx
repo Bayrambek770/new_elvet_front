@@ -23,6 +23,7 @@ import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { Badge } from "@/components/ui/badge";
 import { HospitalizationTasks } from "@/components/nurse/HospitalizationTasks";
+import { NurseCareCardsManager } from "@/components/nurse/NurseCareCardsManager";
 import { tokenStore, api } from "@/lib/apiClient";
 import { useMe } from "@/hooks/api";
 import elvetLogo from "@/assets/elvet_logo.jpg";
@@ -584,15 +585,23 @@ const NurseDashboard = () => {
 
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4 mb-8">
           {statsConfig.map(({ key, label, value, formatter, icon: Icon, subtitle }) => (
-            <Card key={key} className="border-2 hover:shadow-glow transition-all animate-fade-in">
-              <CardHeader className="pb-3">
+            <Card
+              key={key}
+              className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-emerald-50 via-background to-teal-50"
+            >
+              <CardHeader className="pb-3 flex items-center justify-between">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Icon className="w-4 h-4 text-primary" />
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary text-base">
+                    <Icon className="w-4 h-4" />
+                  </span>
                   {label}
                 </CardTitle>
+                <span className="text-lg">✨</span>
               </CardHeader>
               <CardContent>
-                <div className={`text-3xl font-bold text-primary ${isRefreshing ? "opacity-70" : ""}`}>
+                <div className={`text-3xl font-bold bg-gradient-to-r from-primary to-emerald-600 bg-clip-text text-transparent ${
+                  isRefreshing ? "opacity-70" : ""
+                }`}>
                   {formatter(value)}
                 </div>
                 {subtitle && <p className="text-xs text-muted-foreground mt-2">{subtitle}</p>}
@@ -602,22 +611,46 @@ const NurseDashboard = () => {
         </div>
 
         <Tabs defaultValue="procedures" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8 h-auto p-1">
-            <TabsTrigger value="procedures" className="gap-2 py-3">
+          <TabsList className="w-full mb-8 h-auto p-1 rounded-2xl bg-card/80 shadow-md grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            <TabsTrigger
+              value="procedures"
+              className="gap-2 py-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all"
+            >
               <ClipboardList className="w-4 h-4" />
-              {t("nurse.tabs.procedures")}
+              <span className="hidden sm:inline">{t("nurse.tabs.procedures")}</span>
+              <span className="sm:hidden">{t("nurse.tabs.procedures")}</span>
             </TabsTrigger>
-            <TabsTrigger value="medicines" className="gap-2 py-3">
+            <TabsTrigger
+              value="medicines"
+              className="gap-2 py-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all"
+            >
               <Pill className="w-4 h-4" />
-              {t("nurse.tabs.medicines")}
+              <span className="hidden sm:inline">{t("nurse.tabs.medicines")}</span>
+              <span className="sm:hidden">{t("nurse.tabs.medicines")}</span>
             </TabsTrigger>
-            <TabsTrigger value="schedule" className="gap-2 py-3">
+            <TabsTrigger
+              value="schedule"
+              className="gap-2 py-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all"
+            >
               <Calendar className="w-4 h-4" />
-              {t("nurse.tabs.schedule")}
+              <span className="hidden sm:inline">{t("nurse.tabs.schedule")}</span>
+              <span className="sm:hidden">{t("nurse.tabs.schedule")}</span>
             </TabsTrigger>
-            <TabsTrigger value="salary" className="gap-2 py-3">
+            <TabsTrigger
+              value="salary"
+              className="gap-2 py-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-fuchsia-500 data-[state=active]:to-pink-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all"
+            >
               <Wallet className="w-4 h-4" />
-              {t("nurse.tabs.salaryHistory")}
+              <span className="hidden sm:inline">{t("nurse.tabs.salaryHistory")}</span>
+              <span className="sm:hidden">{t("nurse.tabs.salaryHistory")}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="nurse-care"
+              className="gap-2 py-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-rose-500 data-[state=active]:to-red-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all"
+            >
+              <ClipboardList className="w-4 h-4" />
+              <span className="hidden sm:inline">Nurse Care 💗</span>
+              <span className="sm:hidden">Nurse 💗</span>
             </TabsTrigger>
           </TabsList>
 
@@ -831,6 +864,10 @@ const NurseDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="nurse-care" className="space-y-6 animate-fade-in">
+            <NurseCareCardsManager />
           </TabsContent>
         </Tabs>
       </div>
