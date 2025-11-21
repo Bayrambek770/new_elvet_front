@@ -291,21 +291,17 @@ const DoctorDashboard = () => {
       Promise.all([
         api.get(`service-usages/?medical_card=${id}`).then(r => r.data).catch(() => null),
         api.get(`medicine-usages/?medical_card=${id}`).then(r => r.data).catch(() => null),
-        api.get(`feed-usages/?medical_card=${id}`).then(r => r.data).catch(() => null),
         api.get('services/?page=1').then(r => r.data).catch(() => null),
         api.get('medicines/?page=1').then(r => r.data).catch(() => null),
-        api.get('pet-feeds/?page=1').then(r => r.data).catch(() => null),
-      ]).then(([su, mu, fu, sc, mc, fc]) => {
+      ]).then(([su, mu, sc, mc]) => {
         const norm = (d: any) => Array.isArray(d) ? d : (Array.isArray(d?.results) ? d.results : []);
         const suArr: ApiServiceUsage[] = norm(su);
         const muArr: ApiMedicineUsage[] = norm(mu);
-        const fuArr: ApiFeedUsage[] = norm(fu);
         setEditServicesUsages(suArr.map(u => ({ _localId: `su-${u.id}`, ...u })));
         setEditMedicinesUsages(muArr.map(u => ({ _localId: `mu-${u.id}`, ...u })));
-        setEditFeedsUsages(fuArr.map(u => ({ _localId: `fu-${u.id}`, ...u })));
+        setEditFeedsUsages([]);
         setEditFormServices(sc && Array.isArray(sc.results) ? sc : { count: 0, next: null, previous: null, results: [] });
         setEditFormMedicines(mc && Array.isArray(mc.results) ? mc : { count: 0, next: null, previous: null, results: [] });
-        setEditFormFeeds(fc && Array.isArray(fc.results) ? fc : { count: 0, next: null, previous: null, results: [] });
       }).catch((e:any) => setEditUsagesError(e?.message || t('doctor.edit.loadUsagesError')))
         .finally(() => setEditUsagesLoading(false));
     } catch (e:any) {
@@ -924,11 +920,7 @@ const DoctorDashboard = () => {
         name: getMedicineName(Number(mid)),
         dosage: detail.dosage.trim(),
       }).catch(() => null));
-    const feedPosts = Object.entries(selectedFeeds)
-      .filter(([, q]) => (q as number) > 0)
-      .map(([fid, q]) => api.post('feed-usages/', { medical_card: cardId, feed: Number(fid), quantity: Number(q) }).catch(() => null));
-
-    await Promise.allSettled([...servicePosts, ...medicinePosts, ...feedPosts]);
+    await Promise.allSettled([...servicePosts, ...medicinePosts]);
 
     // Refresh client cards list
     try {
@@ -2113,38 +2105,7 @@ const DoctorDashboard = () => {
                       </CardContent>
                     </Card>
 
-                    <Card className="border-2">
-                      <CardHeader>
-                        <CardTitle>{t('doctor.feeds.title')}</CardTitle>
-                        <CardDescription>{t('doctor.feeds.subtitle')}</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <Input placeholder={t('doctor.search.feedPlaceholder')} value={formSearchFeed} onChange={e => setFormSearchFeed(e.target.value)} />
-                        {formFeedsLoading ? (
-                          <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
-                        ) : (
-                          <div className="space-y-2 max-h-64 overflow-auto">
-                            {formFeeds?.results
-                              .filter(f => (f.feed_name || f.name || '').toLowerCase().includes(formSearchFeed.toLowerCase()))
-                              .map(f => {
-                                const name = f.feed_name || f.name || `ID ${f.id}`;
-                                const qty = selectedFeeds[f.id] ?? 0;
-                                return (
-                                  <div key={f.id} className="grid grid-cols-[1fr,100px] items-center gap-3 p-2 border rounded-lg hover:bg-muted/40">
-                                    <div>
-                                      <div className="font-medium">{name}</div>
-                                    </div>
-                                    <Input type="number" min={0} placeholder={t('doctor.qtyZeroPlaceholder')} value={qty || ''} onChange={(e) => toggleFeed(f.id, Number(e.target.value || 0))} />
-                                  </div>
-                                );
-                              })}
-                            {formFeeds && formFeeds.results.filter(f => (f.feed_name || f.name || '').toLowerCase().includes(formSearchFeed.toLowerCase())).length === 0 && (
-                              <div className="text-sm text-muted-foreground">{t('common.nothingFound')}</div>
-                            )}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                    {/* Feeds are no longer selected on the medical card. Doctor only writes recommended_feed_text. */}
 
                     <Card className="border-2">
                       <CardHeader>
@@ -2721,70 +2682,7 @@ const DoctorDashboard = () => {
                   </Card>
                 </div>
 
-                {/* Edit Feeds */}
-                <div className="md:col-span-2">
-                  <Card className="border-2">
-                    <CardHeader>
-                      <CardTitle>{t('doctor.edit.feeds.title')}</CardTitle>
-                      <CardDescription>{t('doctor.edit.feeds.subtitle')}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {editUsagesLoading && <div className="text-sm text-muted-foreground">{t('common.loading')}</div>}
-                      {!editUsagesLoading && (
-                        <div className="space-y-2">
-                          {editFeedsUsages.filter(u => !u._deleted).map(row => (
-                            <div key={row._localId} className="grid sm:grid-cols-[1fr,120px,auto] gap-2 items-center p-2 border rounded-lg">
-                              <Select value={row.feed ? String(row.feed) : undefined} onValueChange={(v) => setEditFeedsUsages(prev => prev.map(x => x._localId === row._localId ? { ...x, feed: Number(v), _dirty: true } : x))}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder={(() => {
-                                    const rec = editFormFeeds?.results.find(f => f.id === row.feed);
-                                    return rec?.feed_name || rec?.name || (row.feed ? t('doctor.edit.feeds.fallback', { id: row.feed }) : t('doctor.edit.feeds.selectPlaceholder'));
-                                  })()} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {editFormFeeds?.results
-                                    .filter(f => (f.feed_name || f.name || '').toLowerCase().includes(editSearchFeed.toLowerCase()))
-                                    .map(f => (
-                                      <SelectItem key={f.id} value={String(f.id)}>{f.feed_name || f.name || `ID ${f.id}`}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                              </Select>
-                              <Input type="number" min={0} value={row.quantity ?? ''} onChange={e => setEditFeedsUsages(prev => prev.map(x => x._localId === row._localId ? { ...x, quantity: Number(e.target.value || 0), _dirty: true } : x))} />
-                              <Button variant="outline" size="sm" onClick={() => setEditFeedsUsages(prev => prev.map(x => x._localId === row._localId ? { ...x, _deleted: true } : x))}>{t('doctor.edit.feeds.delete')}</Button>
-                            </div>
-                          ))}
-                          {editFeedsUsages.filter(u => !u._deleted).length === 0 && (
-                            <div className="text-sm text-muted-foreground">{t('doctor.edit.feeds.empty')}</div>
-                          )}
-                          <div className="pt-2 border-t mt-2">
-                            <div className="grid sm:grid-cols-[1fr,120px,auto] gap-2 items-center">
-                              <Select onValueChange={(v) => {
-                                const feed = Number(v);
-                                setEditFeedsUsages(prev => ([...prev, { _localId: `fu-new-${Date.now()}`, _new: true, feed, quantity: 1, _dirty: true }]));
-                              }}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder={t('doctor.edit.feeds.add')} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <div className="px-2 py-1">
-                                    <Input placeholder={t('doctor.edit.feeds.search')} value={editSearchFeed} onChange={e => setEditSearchFeed(e.target.value)} />
-                                  </div>
-                                  {editFormFeeds?.results
-                                    .filter(f => (f.feed_name || f.name || '').toLowerCase().includes(editSearchFeed.toLowerCase()))
-                                    .map(f => (
-                                      <SelectItem key={f.id} value={String(f.id)}>{f.feed_name || f.name || `ID ${f.id}`}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                              </Select>
-                              <div />
-                              <div />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
+                {/* Feeds editing removed: feeds are billed via separate Feed Sales, not on the medical card. */}
 
                 {/* Attachments: X-rays & Prescriptions */}
                 <div className="md:col-span-2">

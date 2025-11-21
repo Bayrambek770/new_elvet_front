@@ -145,7 +145,6 @@ const Auth = () => {
                           }
                         }}
                         required
-                        pattern={"^\\+998-\\d{2}-\\d{3}-\\d{2}-\\d{2}$"}
                         className="h-12 text-lg"
                       />
                       <p className={`text-xs mt-1 ${phoneError ? "text-destructive" : "text-muted-foreground"}`}>{phoneError ? phoneError : t("auth.phoneHelper")}</p>

@@ -1,6 +1,18 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Auth, Clients, MedicalCards, Schedules, ServiceUsages, Payments, Me, NurseCareCards, type MeResponse } from "@/lib/api";
+import {
+  Auth,
+  Clients,
+  MedicalCards,
+  Schedules,
+  ServiceUsages,
+  Payments,
+  Me,
+  NurseCareCards,
+  PetFeeds,
+  FeedSales,
+  type MeResponse,
+} from "@/lib/api";
 import { api, tokenStore } from "@/lib/apiClient";
 
 export const useLogin = () =>
@@ -37,6 +49,17 @@ export const useWeeklyIncome = () =>
   useQuery({
     queryKey: ["payments", "weekly"],
     queryFn: async () => Payments.weekly(),
+  });
+
+export const usePetFeeds = () =>
+  useQuery({
+    queryKey: ["pet-feeds"],
+    queryFn: async () => {
+      const data = await PetFeeds.list();
+      if (Array.isArray(data)) return data;
+      if (Array.isArray((data as any)?.results)) return (data as any).results;
+      return [];
+    },
   });
 
 export const useAuthGuard = () => {
@@ -134,6 +157,47 @@ export const useRecordNurseCarePayment = () => {
       NurseCareCards.recordPayment(id, { amount_paid, method }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["nurseCareCards"] });
+    },
+  });
+};
+
+export const useFeedSales = (params?: Record<string, unknown>) =>
+  useQuery({
+    queryKey: ["feed-sales", params],
+    queryFn: async () => {
+      const data = await FeedSales.list(params);
+      if (Array.isArray(data)) return data;
+      if (Array.isArray((data as any)?.results)) return (data as any).results;
+      return [];
+    },
+  });
+
+export const useFeedSale = (id: number | string | null) =>
+  useQuery({
+    queryKey: ["feed-sales", id],
+    queryFn: async () => (id ? FeedSales.get(id) : null),
+    enabled: !!id,
+  });
+
+export const useCreateFeedSale = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { client: number; pet?: number | null; items: { feed: number; quantity_kg: string }[] }) =>
+      FeedSales.create(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["feed-sales"] });
+      qc.invalidateQueries({ queryKey: ["pet-feeds"] });
+    },
+  });
+};
+
+export const usePayFeedSale = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, amount }: { id: number; amount: string }) => FeedSales.pay(id, { amount }),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ["feed-sales"] });
+      qc.invalidateQueries({ queryKey: ["feed-sales", id] });
     },
   });
 };

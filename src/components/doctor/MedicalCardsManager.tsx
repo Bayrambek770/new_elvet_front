@@ -28,6 +28,7 @@ export const MedicalCardsManager = ({ userId }: { userId: string }) => {
     anamnesis: "",
     status: "",
     diet: "",
+    recommended_feed_text: "",
     recommendations: "",
     is_hospitalized: false,
     hospitalization_start: "",
@@ -113,6 +114,7 @@ export const MedicalCardsManager = ({ userId }: { userId: string }) => {
         anamnesis: "",
         status: "",
         diet: "",
+        recommended_feed_text: "",
         recommendations: "",
         is_hospitalized: false,
         hospitalization_start: "",
@@ -137,6 +139,7 @@ export const MedicalCardsManager = ({ userId }: { userId: string }) => {
           status: formData.status,
           diet: formData.diet,
           recommendations: formData.recommendations,
+          recommended_feed_text: formData.recommended_feed_text,
           is_hospitalized: formData.is_hospitalized,
           hospitalization_start: formData.hospitalization_start || null,
           hospitalization_end: formData.hospitalization_end || null,
@@ -170,6 +173,7 @@ export const MedicalCardsManager = ({ userId }: { userId: string }) => {
       status: card.status || "",
       diet: card.diet || "",
       recommendations: card.recommendations || "",
+      recommended_feed_text: card.recommended_feed_text || "",
       is_hospitalized: card.is_hospitalized,
       hospitalization_start: card.hospitalization_start || "",
       hospitalization_end: card.hospitalization_end || "",
@@ -243,29 +247,20 @@ export const MedicalCardsManager = ({ userId }: { userId: string }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Статус</Label>
-                  <Input
-                    placeholder="Текущее состояние"
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Диета</Label>
+                  <Label>Анализы</Label>
                   <Textarea
-                    placeholder="Рекомендации по питанию"
+                    placeholder="Общий анализ крови: ..."
                     value={formData.diet}
                     onChange={(e) => setFormData({ ...formData, diet: e.target.value })}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Рекомендации</Label>
+                  <Label>Рекомендованный корм</Label>
                   <Textarea
-                    placeholder="Рекомендации по уходу"
-                    value={formData.recommendations}
-                    onChange={(e) => setFormData({ ...formData, recommendations: e.target.value })}
+                    placeholder="Например: JOSERA Catelux, 0.5 кг в день на 14 дней"
+                    value={formData.recommended_feed_text}
+                    onChange={(e) => setFormData({ ...formData, recommended_feed_text: e.target.value })}
                   />
                 </div>
 
@@ -366,6 +361,15 @@ export const MedicalCardsManager = ({ userId }: { userId: string }) => {
                   placeholder="Рекомендации по питанию"
                   value={formData.diet}
                   onChange={(e) => setFormData({ ...formData, diet: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Рекомендованный корм</Label>
+                <Textarea
+                  placeholder="Например: JOSERA Catelux, 0.5 кг в день на 14 дней"
+                  value={formData.recommended_feed_text}
+                  onChange={(e) => setFormData({ ...formData, recommended_feed_text: e.target.value })}
                 />
               </div>
 

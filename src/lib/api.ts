@@ -147,9 +147,57 @@ export const Medicines = {
   availableCount: async <T = { count: number }>() => (await api.get<T>("medicines/available-count/")).data,
 };
 
+export type PetFeed = {
+  id: number;
+  name: string; // consolidated display name (if backend provides)
+  factory_name: string;
+  brand_name: string;
+  product_name: string;
+  animal_type: "DOG" | "CAT";
+  age_group: "JUNIOR" | "ADULT" | "SENIOR";
+  package_weight_kg: string; // package weight for reference
+  price_per_kg: string; // inventory pricing basis
+  available_weight_kg: string; // current stock in kg
+  description?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export const PetFeeds = {
-  list: <T = unknown>(params?: Record<string, unknown>) => list<T[]>("pet-feeds/", params),
-  get: <T = unknown>(id: ID) => get<T>("pet-feeds/", id),
+  list: <T = PetFeed[]>(params?: Record<string, unknown>) => list<T>("pet-feeds/", params),
+  get: <T = PetFeed>(id: ID) => get<T>("pet-feeds/", id),
+};
+
+export type FeedSaleItem = {
+  id: number;
+  feed: number;
+  quantity_kg: string;
+  unit_price: string;
+  line_total: string;
+  created_at: string;
+};
+
+export type FeedSaleStatus = "WAITING" | "PARTLY_PAID" | "PAID";
+
+export type FeedSale = {
+  id: number;
+  client: number;
+  pet: number | null;
+  moderator: number;
+  status: FeedSaleStatus;
+  total_amount: string;
+  amount_paid: string;
+  created_at: string;
+  updated_at: string;
+  items: FeedSaleItem[];
+};
+
+export const FeedSales = {
+  list: <T = FeedSale[]>(params?: Record<string, unknown>) => list<T>("feed-sales/", params),
+  get: <T = FeedSale>(id: ID) => get<T>("feed-sales/", id),
+  create: <T = FeedSale>(body: { client: ID; pet?: ID | null; moderator?: ID | null; items: { feed: ID; quantity_kg: string }[] }) =>
+    post<T>("feed-sales/", body),
+  pay: <T = FeedSale>(id: ID, body: { amount: string }) => post<T>(`feed-sales/${id}/pay/`, body),
 };
 
 export const ServiceUsages = {
@@ -177,14 +225,8 @@ export const PaymentTransactions = {
     (await api.get<T>("payment-transactions/method-totals/", { params })).data,
 };
 
-export const FeedUsages = {
-  list: <T = unknown>(params?: Record<string, unknown>) => list<T[]>("feed-usages/", params),
-  get: <T = unknown>(id: ID) => get<T>("feed-usages/", id),
-  create: <T = unknown>(body: Record<string, unknown>) => post<T>("feed-usages/", body),
-  update: <T = unknown>(id: ID, body: Record<string, unknown>) => put<T>("feed-usages/", id, body),
-  patch: <T = unknown>(id: ID, body: Record<string, unknown>) => patch<T>("feed-usages/", id, body),
-  remove: (id: ID) => del("feed-usages/", id),
-};
+// Legacy FeedUsages API kept for historical data (no longer used in new flows)
+// FeedUsages API removed from backend; historical data not queried by frontend anymore.
 
 // Schedule
 export const Schedules = {

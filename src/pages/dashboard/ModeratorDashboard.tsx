@@ -26,6 +26,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { MedicalCards, Medicines, Services, Pets, Visits, Requests as RequestsApi, ServiceUsages, MedicineUsages, Clients, Doctors, Utils, PaymentTransactions } from "@/lib/api";
+import { FeedSalesManager } from "@/components/moderator/FeedSalesManager";
+import FeedInventory from "@/components/moderator/FeedInventory";
 import { ModeratorNurseCareCardsManager } from "@/components/moderator/NurseCareCardsManager";
 import elvetLogo from "@/assets/elvet_logo.jpg";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -603,7 +605,7 @@ const ModeratorDashboard = () => {
 
         {/* Dashboard Tabs */}
         <Tabs defaultValue="medicalCards" className="w-full">
-          <TabsList className="w-full mb-8 h-auto p-1 rounded-xl border bg-muted/40 grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <TabsList className="w-full mb-8 h-auto p-1 rounded-xl border bg-muted/40 grid grid-cols-1 sm:grid-cols-4 gap-2">
             {/* First row */}
             <TabsTrigger
               value="medicalCards"
@@ -648,6 +650,20 @@ const ModeratorDashboard = () => {
             >
               <span className="flex-shrink-0">🩺</span>
               <span className="truncate">Nurse Care</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="feedSales"
+              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-lime-100 data-[state=active]:text-lime-700 hover:bg-muted"
+            >
+              <span className="flex-shrink-0">🍽️</span>
+              <span className="truncate">Продажа кормов</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="feedInventory"
+              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 hover:bg-muted"
+            >
+              <span className="flex-shrink-0">📦</span>
+              <span className="truncate">Склад кормов</span>
             </TabsTrigger>
           </TabsList>
 
@@ -763,6 +779,14 @@ const ModeratorDashboard = () => {
 
           <TabsContent value="nurseCare" className="space-y-6 animate-fade-in">
             <ModeratorNurseCareCardsManager />
+          </TabsContent>
+
+          <TabsContent value="feedSales" className="space-y-6 animate-fade-in">
+            <FeedSalesManager />
+          </TabsContent>
+
+          <TabsContent value="feedInventory" className="space-y-6 animate-fade-in">
+            <FeedInventory />
           </TabsContent>
 
           {/* Clients list */}
@@ -1107,6 +1131,15 @@ const ModeratorDashboard = () => {
                     </div>
                   )}
 
+                  {selectedCard?.recommended_feed_text && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Рекомендованный корм врача</p>
+                      <div className="border rounded p-2 bg-muted/30 whitespace-pre-wrap text-sm">
+                        {selectedCard.recommended_feed_text}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Fee breakdown */}
                   <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
                     <div className="p-3 border rounded-lg bg-background">
@@ -1116,10 +1149,6 @@ const ModeratorDashboard = () => {
                     <div className="p-3 border rounded-lg bg-background">
                       <p className="text-xs text-muted-foreground">Стационар (stationary_fee)</p>
                       <p className="font-semibold">{selectedCard?.stationary_fee ?? selectedCard?.stationary_total ?? "—"}</p>
-                    </div>
-                    <div className="p-3 border rounded-lg bg-background">
-                      <p className="text-xs text-muted-foreground">Корма (feeds_fee)</p>
-                      <p className="font-semibold">{selectedCard?.feeds_fee ?? selectedCard?.feeds_total ?? "—"}</p>
                     </div>
                     <div className="p-3 border rounded-lg bg-background">
                       <p className="text-xs text-muted-foreground">Препараты (medicines_fee)</p>
