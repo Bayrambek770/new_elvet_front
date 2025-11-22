@@ -937,7 +937,6 @@ export const uz = {
   "client.medicalCards.column.waiting": "To'lovni kutmoqda",
   "client.medicalCards.column.partlyPaid": "Qisman to'langan",
   "client.medicalCards.column.fullyPaid": "To'liq to'langan",
-  "client.medicalCards.stationaryBadge": "Statsionar",
   "client.medicalCards.currency.sum": "so'm",
   "client.medicalCards.attachments": "Ilovalar",
   "client.medicalCards.attachments.downloadAll": "Hammasini yuklab olish",

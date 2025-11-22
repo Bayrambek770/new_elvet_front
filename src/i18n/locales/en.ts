@@ -937,7 +937,6 @@ export const en = {
   "client.medicalCards.column.waiting": "Waiting for Payment",
   "client.medicalCards.column.partlyPaid": "Partly Paid",
   "client.medicalCards.column.fullyPaid": "Fully Paid",
-  "client.medicalCards.stationaryBadge": "Stationary",
   "client.medicalCards.currency.sum": "UZS",
   "client.medicalCards.attachments": "Attachments",
   "client.medicalCards.attachments.downloadAll": "Download all",

@@ -939,7 +939,6 @@ export const ru = {
   "client.medicalCards.column.waiting": "Ожидающие оплаты",
   "client.medicalCards.column.partlyPaid": "Частично оплаченные",
   "client.medicalCards.column.fullyPaid": "Полностью оплаченные",
-  "client.medicalCards.stationaryBadge": "Стационар",
   "client.medicalCards.currency.sum": "сум",
   "client.medicalCards.attachments": "Вложения",
   "client.medicalCards.attachments.downloadAll": "Скачать всё",
