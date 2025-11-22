@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ const Contact = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -46,12 +47,41 @@ const Contact = () => {
     return out;
   };
 
+  // Phone validation regex - matches +998-XX-XXX-XX-XX format
+  const phoneRegex = /^\+998-\d{2}-\d{3}-\d{2}-\d{2}$/;
+
+  const validatePhone = (value: string): boolean => {
+    return phoneRegex.test(value);
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatUzPhoneMasked(e.target.value);
+    setFormData({ ...formData, phone: formatted });
+    
+    // Clear custom validity when user types
+    if (phoneInputRef.current) {
+      phoneInputRef.current.setCustomValidity("");
+    }
+  };
+
+  const handlePhoneInvalid = (e: React.InvalidEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const value = input.value;
+    
+    // Custom validation for Safari compatibility
+    if (!validatePhone(value)) {
+      input.setCustomValidity(t("contacts.form.phoneInvalid") || "Please enter a valid phone number in format +998-XX-XXX-XX-XX");
+    } else {
+      input.setCustomValidity("");
+    }
+  };
+
   const nameRegex = /^[A-Za-zА-Яа-яЁё' -]{2,64}$/;
 
   const isValid =
     nameRegex.test(formData.firstName.trim()) &&
     nameRegex.test(formData.lastName.trim()) &&
-    Boolean(formData.phone.trim()) &&
+    validatePhone(formData.phone) &&
     formData.message.trim().length >= 5;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -111,13 +141,15 @@ const Contact = () => {
                   {t("contacts.form.phone")} *
                 </Label>
                 <Input
+                  ref={phoneInputRef}
                   id="phone"
                   type="tel"
                   placeholder={"+998-XX-XXX-XX-XX"}
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: formatUzPhoneMasked(e.target.value) })}
+                  onChange={handlePhoneChange}
+                  onInvalid={handlePhoneInvalid}
                   required
-                  pattern="^\\+998(?:[ -]?\\d){9}$"
+                  pattern="^\+998-\d{2}-\d{3}-\d{2}-\d{2}$"
                   className="h-12"
                 />
                 <p className="text-xs text-muted-foreground">
