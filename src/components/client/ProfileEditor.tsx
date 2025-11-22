@@ -165,7 +165,7 @@ export const ProfileEditor = ({ user }: { user: MeResponse }) => {
                     id="extra_number1"
                     inputMode="tel"
                     pattern="^\\+?\\d{8,15}$"
-                    placeholder="+998 90 123 45 67"
+                    placeholder={t("client.profile.phonePlaceholder")}
                     value={formData.extra_number1}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -191,7 +191,7 @@ export const ProfileEditor = ({ user }: { user: MeResponse }) => {
                     id="extra_number2"
                     inputMode="tel"
                     pattern="^\\+?\\d{8,15}$"
-                    placeholder="+998 90 123 45 67"
+                    placeholder={t("client.profile.phonePlaceholder")}
                     value={formData.extra_number2}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -254,7 +254,7 @@ export const ProfileEditor = ({ user }: { user: MeResponse }) => {
                 </div>
                 <div className="flex-1">
                   <div className="text-sm font-medium text-muted-foreground mb-1">{t("client.profile.firstName")}</div>
-                  <div className="text-lg sm:text-xl font-semibold">{t("client.profile.firstName")}: {user?.first_name || "—"} {user?.last_name || ""}</div>
+                  <div className="text-lg sm:text-xl font-semibold">{user?.first_name || "—"} {user?.last_name || ""}</div>
                 </div>
               </div>
             </div>

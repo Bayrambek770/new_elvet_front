@@ -185,7 +185,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
           <div className="grid md:grid-cols-3 gap-6">
             {/* Waiting for Payment Column */}
             <div>
-              <h3 className="text-base font-semibold mb-3">Waiting for Payment</h3>
+              <h3 className="text-base font-semibold mb-3">{t("client.medicalCards.column.waiting")}</h3>
               <div className="space-y-3">
                 {medicalCards.filter((c) => isWaitingForPayment(c)).map((card) => (
                   <div key={card.id} className="rounded-lg border p-4 hover:shadow-md transition-all">
@@ -198,8 +198,8 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {card.is_hospitalized && <Badge variant="outline">Стационар</Badge>}
-                        <Badge variant="secondary">{formatSum(detailsByCard[card.id]?.total_fee ?? card.total_amount)} SUM</Badge>
+                        {card.is_hospitalized && <Badge variant="outline">{t("client.medicalCards.stationaryBadge")}</Badge>}
+                        <Badge variant="secondary">{formatSum(detailsByCard[card.id]?.total_fee ?? card.total_amount)} {t("client.medicalCards.currency.sum").toUpperCase()}</Badge>
                       </div>
                     </div>
 
@@ -236,7 +236,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                 return services.length > 0 ? (
                                   <ul className="text-sm space-y-1">
                                     {services.map((s) => (
-                                      <li key={s.id || s.name}>• {s.name} ({s.quantity}x){s.price ? ` — ${formatSum(s.price)} SUM` : ""}</li>
+                                      <li key={s.id || s.name}>• {s.name} ({s.quantity}x){s.price ? ` — ${formatSum(s.price)} ${t("client.medicalCards.currency.sum").toUpperCase()}` : ""}</li>
                                     ))}
                                   </ul>
                                 ) : (
@@ -274,7 +274,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                 <div className="space-y-3">
                                   <div className="flex items-center justify-between gap-2 text-sm font-medium">
                                     <div className="flex items-center gap-2">
-                                      <Paperclip className="w-4 h-4 text-primary" /> {t("client.medicalCards.attachments", { defaultValue: "Вложения" })}
+                                      <Paperclip className="w-4 h-4 text-primary" /> {t("client.medicalCards.attachments")}
                                     </div>
                                     <Button
                                       type="button"
@@ -284,7 +284,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                       onClick={() => handleDownloadAll(card.id)}
                                     >
                                       <Download className="w-3 h-3" />
-                                      {t("client.medicalCards.attachments.downloadAll", { defaultValue: "Скачать всё" })}
+                                      {t("client.medicalCards.attachments.downloadAll")}
                                     </Button>
                                   </div>
 
@@ -292,7 +292,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                   {xrays.length > 0 && (
                                     <div className="space-y-1">
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <ImageIcon className="w-3 h-3" /> {t("client.medicalCards.attachments.xrays", { defaultValue: "Рентген-снимки" })}
+                                        <ImageIcon className="w-3 h-3" /> {t("client.medicalCards.attachments.xrays")}
                                       </div>
                                       <div className="grid grid-cols-3 gap-2">
                                         {xrays.map((att: any) => (
@@ -318,7 +318,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                               className="inline-flex items-center justify-center rounded-md border bg-background px-2 py-1 text-[11px] hover:bg-muted/80"
                                             >
                                               <Download className="mr-1 h-3 w-3" />
-                                              {t("client.medicalCards.attachments.download", { defaultValue: "Скачать" })}
+                                              {t("client.medicalCards.attachments.download")}
                                             </button>
                                           </div>
                                         ))}
@@ -330,7 +330,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                   {(prescriptions.length > 0 || others.length > 0) && (
                                     <div className="space-y-1">
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <FileText className="w-3 h-3" /> {t("client.medicalCards.attachments.files", { defaultValue: "Файлы" })}
+                                        <FileText className="w-3 h-3" /> {t("client.medicalCards.attachments.files")}
                                       </div>
                                       <div className="space-y-1 text-xs">
                                         {[...prescriptions, ...others].map((att: any) => {
@@ -351,7 +351,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                                 className="inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] text-primary hover:bg-muted"
                                               >
                                                 <Download className="mr-1 h-3 w-3" />
-                                                {t("client.medicalCards.attachments.download", { defaultValue: "Скачать" })}
+                                                {t("client.medicalCards.attachments.download")}
                                               </button>
                                             </div>
                                           );
@@ -373,7 +373,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
 
             {/* Partly Paid Column */}
             <div>
-              <h3 className="text-base font-semibold mb-3">Partly Paid</h3>
+              <h3 className="text-base font-semibold mb-3">{t("client.medicalCards.column.partlyPaid")}</h3>
               <div className="space-y-3">
                 {medicalCards.filter((c) => isPartlyPaid(c)).map((card) => (
                   <div key={card.id} className="rounded-lg border p-4 hover:shadow-md transition-all">
@@ -424,7 +424,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                 return services.length > 0 ? (
                                   <ul className="text-sm space-y-1">
                                     {services.map((s) => (
-                                      <li key={s.id || s.name}>• {s.name} ({s.quantity}x){s.price ? ` — ${formatSum(s.price)} SUM` : ""}</li>
+                                      <li key={s.id || s.name}>• {s.name} ({s.quantity}x){s.price ? ` — ${formatSum(s.price)} ${t("client.medicalCards.currency.sum").toUpperCase()}` : ""}</li>
                                     ))}
                                   </ul>
                                 ) : (
@@ -462,7 +462,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                 <div className="space-y-3">
                                   <div className="flex items-center justify-between gap-2 text-sm font-medium">
                                     <div className="flex items-center gap-2">
-                                      <Paperclip className="w-4 h-4 text-primary" /> {t("client.medicalCards.attachments", { defaultValue: "Вложения" })}
+                                      <Paperclip className="w-4 h-4 text-primary" /> {t("client.medicalCards.attachments")}
                                     </div>
                                     <Button
                                       type="button"
@@ -472,7 +472,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                       onClick={() => handleDownloadAll(card.id)}
                                     >
                                       <Download className="w-3 h-3" />
-                                      {t("client.medicalCards.attachments.downloadAll", { defaultValue: "Скачать всё" })}
+                                      {t("client.medicalCards.attachments.downloadAll")}
                                     </Button>
                                   </div>
 
@@ -480,7 +480,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                   {xrays.length > 0 && (
                                     <div className="space-y-1">
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <ImageIcon className="w-3 h-3" /> {t("client.medicalCards.attachments.xrays", { defaultValue: "Рентген-снимки" })}
+                                        <ImageIcon className="w-3 h-3" /> {t("client.medicalCards.attachments.xrays")}
                                       </div>
                                       <div className="grid grid-cols-3 gap-2">
                                         {xrays.map((att: any) => (
@@ -496,7 +496,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                               className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
                                             />
                                             <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                                              <span className="text-xs font-medium text-white">{t("client.medicalCards.attachments.open", { defaultValue: "Открыть" })}</span>
+                                              <span className="text-xs font-medium text-white">{t("client.medicalCards.attachments.open")}</span>
                                             </div>
                                           </button>
                                         ))}
@@ -508,7 +508,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                   {(prescriptions.length > 0 || others.length > 0) && (
                                     <div className="space-y-1">
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <FileText className="w-3 h-3" /> {t("client.medicalCards.attachments.files", { defaultValue: "Файлы" })}
+                                        <FileText className="w-3 h-3" /> {t("client.medicalCards.attachments.files")}
                                       </div>
                                       <div className="space-y-1 text-xs">
                                         {[...prescriptions, ...others].map((att: any) => {
@@ -523,7 +523,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                             >
                                               <span className="truncate pr-2">{name}</span>
                                               <span className="text-[11px] text-primary">
-                                                {t("client.medicalCards.attachments.openFile", { defaultValue: "Открыть" })}
+                                                {t("client.medicalCards.attachments.openFile")}
                                               </span>
                                             </button>
                                           );
@@ -545,7 +545,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
 
             {/* Fully Paid Column */}
             <div>
-              <h3 className="text-base font-semibold mb-3">Fully Paid</h3>
+              <h3 className="text-base font-semibold mb-3">{t("client.medicalCards.column.fullyPaid")}</h3>
               <div className="space-y-3">
                 {medicalCards.filter((c) => isFullyPaid(c)).map((card) => (
                   <div key={card.id} className="rounded-lg border p-4 hover:shadow-md transition-all">
@@ -596,7 +596,7 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                 return services.length > 0 ? (
                                   <ul className="text-sm space-y-1">
                                     {services.map((s) => (
-                                      <li key={s.id || s.name}>• {s.name} ({s.quantity}x){s.price ? ` — ${formatSum(s.price)} SUM` : ""}</li>
+                                      <li key={s.id || s.name}>• {s.name} ({s.quantity}x){s.price ? ` — ${formatSum(s.price)} ${t("client.medicalCards.currency.sum").toUpperCase()}` : ""}</li>
                                     ))}
                                   </ul>
                                 ) : (

@@ -132,7 +132,7 @@ const ModeratorDashboard = () => {
         setPartlyCards([]);
       }
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить карты" });
+      toast({ variant: "destructive", title: t("common.error"), description: e?.message || t("moderator.errors.loadCards") });
     } finally {
       setWaitingLoading(false);
     }
@@ -161,7 +161,7 @@ const ModeratorDashboard = () => {
         setCardServices(toArray(servicesRes));
         setCardMedicines(toArray(medsRes));
       } catch (e: any) {
-        toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить позиции карты" });
+        toast({ variant: "destructive", title: t("common.error"), description: e?.message || t("moderator.errors.loadItems") });
         setCardServices([]);
         setCardMedicines([]);
       } finally {
@@ -186,7 +186,7 @@ const ModeratorDashboard = () => {
       const arr = Array.isArray(data) ? data : (data as any)?.results || [];
       setPayments(arr);
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить платежи" });
+      toast({ variant: "destructive", title: t("common.error"), description: e?.message || t("moderator.errors.loadPayments") });
       setPayments([]);
     } finally {
       setPaymentsLoading(false);
@@ -199,7 +199,7 @@ const ModeratorDashboard = () => {
       const data = await Visits.list<{ count?: number; next?: string; previous?: string; results?: any[] }>();
       setVisitsPage({ count: (data as any).count, next: (data as any).next, previous: (data as any).previous, results: (data as any).results || (Array.isArray(data) ? (data as any) : []) });
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить визиты" });
+      toast({ variant: "destructive", title: t("common.error"), description: e?.message || t("moderator.errors.loadVisits") });
     } finally {
       setVisitsLoading(false);
     }
@@ -278,7 +278,7 @@ const ModeratorDashboard = () => {
         results: filteredResults,
       });
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить клиентов" });
+      toast({ variant: "destructive", title: t("common.error"), description: e?.message || t("moderator.errors.loadClients") });
     } finally {
       setClientsLoading(false);
     }
@@ -297,7 +297,7 @@ const ModeratorDashboard = () => {
         results: data?.results || [],
       });
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить клиентов" });
+      toast({ variant: "destructive", title: t("common.error"), description: e?.message || t("moderator.errors.loadClients") });
     } finally {
       setClientsLoading(false);
     }
@@ -351,19 +351,19 @@ const ModeratorDashboard = () => {
 
   const handleCreateVisit = async () => {
     if (!visitClientId || !visitDoctorId || !visitPetId) {
-      toast({ variant: "destructive", title: "Проверьте поля", description: "Выберите клиента, врача и питомца" });
+      toast({ variant: "destructive", title: t("moderator.visits.create.validation"), description: t("moderator.visits.create.validationDesc") });
       return;
     }
     setVisitCreating(true);
     try {
       await Visits.create({ client: Number(visitClientId), doctor: Number(visitDoctorId), pet: Number(visitPetId) });
-      toast({ title: "Визит создан" });
+      toast({ title: t("moderator.visits.create.success") });
       setVisitClientId("");
       setVisitDoctorId("");
       setVisitPetId("");
       await handleSearchVisits();
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось создать визит" });
+      toast({ variant: "destructive", title: t("moderator.visits.create.error"), description: e?.message || t("moderator.visits.create.errorDesc") });
     } finally {
       setVisitCreating(false);
     }
@@ -472,7 +472,7 @@ const ModeratorDashboard = () => {
         } catch {}
       }
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Ошибка", description: e?.message || "Не удалось загрузить запросы" });
+      toast({ variant: "destructive", title: t("common.error"), description: e?.message || t("moderator.errors.loadRequests") });
     } finally {
       setRqLoading(false);
     }
@@ -482,7 +482,7 @@ const ModeratorDashboard = () => {
     tokenStore.clear();
     toast({
       title: t("dashboard.logout"),
-      description: "До свидания!",
+      description: t("common.goodbye"),
     });
     navigate("/");
   };
@@ -496,9 +496,9 @@ const ModeratorDashboard = () => {
       const { data } = await api.patch(`me/`, form, { headers: { "Content-Type": "multipart/form-data" } });
       qc.setQueryData(["me"], (prev: any) => ({ ...(prev || {}), image: data?.image ?? prev?.image ?? null }));
       await qc.invalidateQueries({ queryKey: ["me"] });
-      toast({ title: "Фото обновлено" });
+      toast({ title: t("moderator.photo.updated") });
     } catch (e: any) {
-      toast({ title: "Ошибка", description: e?.message || "Не удалось обновить фото", variant: "destructive" });
+      toast({ title: t("moderator.errors.updatePhoto"), description: e?.message || t("moderator.errors.updatePhotoDesc"), variant: "destructive" });
     } finally {
       setBannerUploading(false);
     }
@@ -523,7 +523,7 @@ const ModeratorDashboard = () => {
             type="button"
             onClick={() => navigate("/")}
             className="flex items-center gap-3 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary transition hover:opacity-90 hover-scale"
-            aria-label="Вернуться на главную"
+            aria-label={t("common.goHome")}
           >
             <img src={elvetLogo} alt="ELVET" className="w-12 h-12 rounded-xl object-cover shadow-glow border border-white/30" />
             <div className="text-left">
@@ -559,16 +559,16 @@ const ModeratorDashboard = () => {
                   <label className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => handleBannerImageChange(e.target.files?.[0])} />
                     <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/90 text-black px-3 py-1 rounded-full shadow">
-                      <ImageIcon className="w-4 h-4" /> {bannerUploading ? 'Загрузка…' : 'Изменить'}
+                      <ImageIcon className="w-4 h-4" /> {bannerUploading ? t("moderator.banner.uploading") : t("moderator.banner.changeImage")}
                     </span>
                   </label>
                 </div>
               </div>
               <div>
                 <h2 className="text-3xl font-bold mb-1">
-                  {t("dashboard.welcome")}, {me?.first_name ? `${me.first_name}` : "Модератор"}! 👤
+                  {t("dashboard.welcome")}, {me?.first_name ? `${me.first_name}` : t("moderator.banner.fallbackRole")}! 👤
                 </h2>
-                <p className="text-primary-foreground/90 text-lg">Панель модератора клиники</p>
+                <p className="text-primary-foreground/90 text-lg">{t("moderator.banner.subtitle")}</p>
               </div>
             </div>
           </div>
@@ -582,7 +582,7 @@ const ModeratorDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">{kpis.medicinesAvailable}</div>
-              <p className="text-xs text-muted-foreground mt-1">quantity &gt; 0</p>
+              <p className="text-xs text-muted-foreground mt-1">{t("moderator.kpi.quantityGreaterThanZero")}</p>
             </CardContent>
           </Card>
           <Card className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-sky-50 to-transparent">
@@ -605,25 +605,25 @@ const ModeratorDashboard = () => {
 
         {/* Dashboard Tabs */}
         <Tabs defaultValue="medicalCards" className="w-full">
-          <TabsList className="w-full mb-8 h-auto p-1 rounded-xl border bg-muted/40 grid grid-cols-1 sm:grid-cols-4 gap-2">
+          <TabsList className="w-full mb-8 h-auto p-1 rounded-xl border bg-muted/40 grid grid-cols-2 md:grid-cols-4 gap-2">
             {/* First row */}
             <TabsTrigger
               value="medicalCards"
-              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted"
+              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted text-sm"
             >
               <span className="flex-shrink-0">🧾</span>
               <span className="truncate">{t("dashboard.medicalCards")}</span>
             </TabsTrigger>
             <TabsTrigger
               value="visits"
-              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 hover:bg-muted"
+              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 hover:bg-muted text-sm"
             >
               <span className="flex-shrink-0">📅</span>
               <span className="truncate">{t("moderator.tabs.visits")}</span>
             </TabsTrigger>
             <TabsTrigger
               value="requests"
-              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 hover:bg-muted"
+              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 hover:bg-muted text-sm"
             >
               <span className="flex-shrink-0">📥</span>
               <span className="truncate">{t("moderator.tabs.requests")}</span>
@@ -632,38 +632,38 @@ const ModeratorDashboard = () => {
             {/* Second row */}
             <TabsTrigger
               value="clients"
-              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-sky-100 data-[state=active]:text-sky-700 hover:bg-muted"
+              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-sky-100 data-[state=active]:text-sky-700 hover:bg-muted text-sm"
             >
               <span className="flex-shrink-0">👥</span>
-              <span className="truncate">Клиенты</span>
+              <span className="truncate">{t("moderator.tabs.clients")}</span>
             </TabsTrigger>
             <TabsTrigger
               value="addUser"
-              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-fuchsia-100 data-[state=active]:text-fuchsia-700 hover:bg-muted"
+              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-fuchsia-100 data-[state=active]:text-fuchsia-700 hover:bg-muted text-sm"
             >
               <span className="flex-shrink-0">➕</span>
-              <span className="truncate">Добавить пользователя</span>
+              <span className="truncate">{t("moderator.tabs.addUser")}</span>
             </TabsTrigger>
             <TabsTrigger
               value="nurseCare"
-              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 hover:bg-muted"
+              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 hover:bg-muted text-sm"
             >
               <span className="flex-shrink-0">🩺</span>
-              <span className="truncate">Nurse Care</span>
+              <span className="truncate">{t("moderator.tabs.nurseCare")}</span>
             </TabsTrigger>
             <TabsTrigger
               value="feedSales"
-              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-lime-100 data-[state=active]:text-lime-700 hover:bg-muted"
+              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-lime-100 data-[state=active]:text-lime-700 hover:bg-muted text-sm"
             >
               <span className="flex-shrink-0">🍽️</span>
-              <span className="truncate">Продажа кормов</span>
+              <span className="truncate">{t("moderator.tabs.feedSales")}</span>
             </TabsTrigger>
             <TabsTrigger
               value="feedInventory"
-              className="gap-2 py-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 hover:bg-muted"
+              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 hover:bg-muted text-sm"
             >
               <span className="flex-shrink-0">📦</span>
-              <span className="truncate">Склад кормов</span>
+              <span className="truncate">{t("moderator.tabs.feedInventory")}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -687,11 +687,11 @@ const ModeratorDashboard = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>ID</TableHead>
-                        <TableHead>Клиент</TableHead>
-                        <TableHead>Питомец</TableHead>
-                        <TableHead>Сумма</TableHead>
-                        <TableHead>Статус</TableHead>
-                        <TableHead className="text-right">Действия</TableHead>
+                        <TableHead>{t("moderator.card.table.client")}</TableHead>
+                        <TableHead>{t("moderator.card.table.pet")}</TableHead>
+                        <TableHead>{t("moderator.card.table.amount")}</TableHead>
+                        <TableHead>{t("moderator.card.table.status")}</TableHead>
+                        <TableHead className="text-right">{t("moderator.card.table.actions")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -720,19 +720,19 @@ const ModeratorDashboard = () => {
                 {/* Partly-paid cards */}
                 <div className="rounded-lg border mt-6 overflow-x-auto">
                   <div className="px-4 py-3 border-b bg-muted/40 flex items-center justify-between">
-                    <p className="font-semibold text-sm">Карты с частичной оплатой ({partlyCards.length})</p>
-                    <span className="text-xs text-muted-foreground">Статус: PARTLY_PAID</span>
+                    <p className="font-semibold text-sm">{t("moderator.card.partlyPaid.title")} ({partlyCards.length})</p>
+                    <span className="text-xs text-muted-foreground">{t("moderator.card.partlyPaid.status")}</span>
                   </div>
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>ID</TableHead>
-                        <TableHead>Клиент</TableHead>
-                        <TableHead>Питомец</TableHead>
-                        <TableHead>Всего</TableHead>
-                        <TableHead>Оплачено</TableHead>
-                        <TableHead>Остаток</TableHead>
-                        <TableHead className="text-right">Действия</TableHead>
+                        <TableHead>{t("moderator.card.table.client")}</TableHead>
+                        <TableHead>{t("moderator.card.table.pet")}</TableHead>
+                        <TableHead>{t("moderator.card.partlyPaid.table.total")}</TableHead>
+                        <TableHead>{t("moderator.card.partlyPaid.table.paid")}</TableHead>
+                        <TableHead>{t("moderator.card.partlyPaid.table.outstanding")}</TableHead>
+                        <TableHead className="text-right">{t("moderator.card.table.actions")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -793,36 +793,36 @@ const ModeratorDashboard = () => {
           <TabsContent value="clients" className="space-y-6 animate-fade-in">
             <Card className="border-2">
               <CardHeader>
-                <CardTitle>Клиенты</CardTitle>
-                <CardDescription>Список всех клиентов клиники</CardDescription>
+                <CardTitle>{t("moderator.clients.title")}</CardTitle>
+                <CardDescription>{t("moderator.clients.subtitle")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid md:grid-cols-3 gap-3">
                   <div>
-                    <Label htmlFor="clientFilterId">ID клиента</Label>
+                    <Label htmlFor="clientFilterId">{t("moderator.clients.filter.id")}</Label>
                     <Input
                       id="clientFilterId"
                       value={clientFilterId}
                       onChange={(e) => setClientFilterId(e.target.value)}
-                      placeholder="Например: 123"
+                      placeholder={t("moderator.clients.filter.idPlaceholder")}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="clientFilterName">Имя или фамилия</Label>
+                    <Label htmlFor="clientFilterName">{t("moderator.clients.filter.name")}</Label>
                     <Input
                       id="clientFilterName"
                       value={clientFilterName}
                       onChange={(e) => setClientFilterName(e.target.value)}
-                      placeholder="Имя или фамилия клиента"
+                      placeholder={t("moderator.clients.filter.namePlaceholder")}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="clientFilterPhone">Телефон</Label>
+                    <Label htmlFor="clientFilterPhone">{t("moderator.clients.filter.phone")}</Label>
                     <Input
                       id="clientFilterPhone"
                       value={clientFilterPhone}
                       onChange={(e) => setClientFilterPhone(e.target.value)}
-                      placeholder="Поиск по телефону"
+                      placeholder={t("moderator.clients.filter.phonePlaceholder")}
                     />
                   </div>
                 </div>
@@ -831,12 +831,12 @@ const ModeratorDashboard = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Имя</TableHead>
-                        <TableHead>Фамилия</TableHead>
-                        <TableHead>Телефон</TableHead>
-                        <TableHead>Доп. телефон 1</TableHead>
-                        <TableHead>Доп. телефон 2</TableHead>
+                        <TableHead>{t("moderator.clients.table.id")}</TableHead>
+                        <TableHead>{t("moderator.clients.table.firstName")}</TableHead>
+                        <TableHead>{t("moderator.clients.table.lastName")}</TableHead>
+                        <TableHead>{t("moderator.clients.table.phone")}</TableHead>
+                        <TableHead>{t("moderator.clients.table.extraPhone1")}</TableHead>
+                        <TableHead>{t("moderator.clients.table.extraPhone2")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -849,7 +849,7 @@ const ModeratorDashboard = () => {
                       ) : clientsPage.results.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={6} className="text-center text-muted-foreground">
-                            Нет клиентов для отображения
+                            {t("moderator.clients.empty")}
                           </TableCell>
                         </TableRow>
                       ) : (
@@ -899,8 +899,8 @@ const ModeratorDashboard = () => {
           <TabsContent value="addUser" className="space-y-6 animate-fade-in">
             <Card className="border-2">
               <CardHeader>
-                <CardTitle>Регистрация нового клиента</CardTitle>
-                <CardDescription>Создайте клиента, указав телефон и пароль. Имя и фамилия — необязательно.</CardDescription>
+                <CardTitle>{t("moderator.addUser.title")}</CardTitle>
+                <CardDescription>{t("moderator.addUser.subtitle")}</CardDescription>
               </CardHeader>
               <AddClientForm />
             </Card>
@@ -917,9 +917,9 @@ const ModeratorDashboard = () => {
               <CardContent className="space-y-4">
                 <div className="grid md:grid-cols-3 gap-3">
                   <div>
-                    <Label>Клиент</Label>
+                    <Label>{t("moderator.visits.create.client")}</Label>
                     <Select value={visitClientId} onValueChange={(v) => setVisitClientId(v)}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder={listsLoading ? "Загрузка…" : "Выберите клиента"} /></SelectTrigger>
+                      <SelectTrigger className="w-full"><SelectValue placeholder={listsLoading ? t("moderator.select.loading") : t("moderator.select.client")} /></SelectTrigger>
                       <SelectContent>
                         {clientsList.map((c: any) => {
                           const candidate = c.full_name ?? c.name ?? c.username ?? [c.first_name, c.last_name].filter(Boolean).join(" ");
@@ -932,9 +932,9 @@ const ModeratorDashboard = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label>Врач</Label>
+                    <Label>{t("moderator.visits.create.doctor")}</Label>
                     <Select value={visitDoctorId} onValueChange={(v) => setVisitDoctorId(v)}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder={listsLoading ? "Загрузка…" : "Выберите врача"} /></SelectTrigger>
+                      <SelectTrigger className="w-full"><SelectValue placeholder={listsLoading ? t("moderator.select.loading") : t("moderator.select.doctor")} /></SelectTrigger>
                       <SelectContent>
                         {doctorsList.map((d: any) => {
                           const candidate = d.full_name ?? d.name ?? d.username ?? d.user?.full_name ?? [d.first_name, d.last_name].filter(Boolean).join(" ");
@@ -947,9 +947,9 @@ const ModeratorDashboard = () => {
                     </Select>
                   </div>
                   <div>
-                    <Label>Питомец</Label>
+                    <Label>{t("moderator.visits.create.pet")}</Label>
                     <Select value={visitPetId} onValueChange={(v) => setVisitPetId(v)}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder={listsLoading ? "Загрузка…" : "Выберите питомца"} /></SelectTrigger>
+                      <SelectTrigger className="w-full"><SelectValue placeholder={listsLoading ? t("moderator.select.loading") : t("moderator.select.pet")} /></SelectTrigger>
                       <SelectContent>
                         {petsList.map((p: any) => (
                           <SelectItem key={`pet-${p.id}`} value={String(p.id)}>{p.name ?? p.nickname ?? `#${p.id}`}</SelectItem>
@@ -984,10 +984,10 @@ const ModeratorDashboard = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Дата</TableHead>
-                        <TableHead>Клиент</TableHead>
-                        <TableHead>Врач</TableHead>
-                        <TableHead>Питомец</TableHead>
+                        <TableHead>{t("moderator.visits.table.date")}</TableHead>
+                        <TableHead>{t("moderator.visits.table.client")}</TableHead>
+                        <TableHead>{t("moderator.visits.table.doctor")}</TableHead>
+                        <TableHead>{t("moderator.visits.table.pet")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1033,11 +1033,11 @@ const ModeratorDashboard = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Имя</TableHead>
-                        <TableHead>Фамилия</TableHead>
-                        <TableHead>Телефон</TableHead>
-                        <TableHead>Создано</TableHead>
+                        <TableHead>{t("moderator.requests.table.id")}</TableHead>
+                        <TableHead>{t("moderator.requests.table.firstName")}</TableHead>
+                        <TableHead>{t("moderator.requests.table.lastName")}</TableHead>
+                        <TableHead>{t("moderator.requests.table.phone")}</TableHead>
+                        <TableHead>{t("moderator.requests.table.created")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1068,13 +1068,13 @@ const ModeratorDashboard = () => {
           {/* Modal: Medical card details and confirm payment */}
           {selectedCard && (
             <Dialog open={!!selectedCard} onOpenChange={(open) => { if (!open) setSelectedCard(null); }}>
-              <DialogContent className="max-w-3xl">
+              <DialogContent className="max-w-3xl max-h-[90vh] sm:max-h-[85vh] flex flex-col">
                 <DialogHeader>
                   <DialogTitle>{t("moderator.card.modal.title", { id: selectedCard?.id })}</DialogTitle>
                   <DialogDescription>{t("moderator.card.modal.subtitle")}</DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-3">
+                <div className="space-y-3 overflow-y-auto pr-1 sm:pr-2">
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div>
                       <p className="text-xs text-muted-foreground">{t("moderator.card.modal.client")}</p>
@@ -1098,15 +1098,15 @@ const ModeratorDashboard = () => {
                   {typeof selectedCard?.total_fee !== "undefined" && (
                     <div className="grid sm:grid-cols-3 gap-3">
                       <div className="p-3 border rounded-lg bg-background">
-                        <p className="text-xs text-muted-foreground">Оплачено</p>
+                        <p className="text-xs text-muted-foreground">{t("moderator.card.modal.paid")}</p>
                         <p className="font-semibold">{selectedCard?.amount_paid ?? "0"}</p>
                       </div>
                       <div className="p-3 border rounded-lg bg-background">
-                        <p className="text-xs text-muted-foreground">Остаток к оплате</p>
+                        <p className="text-xs text-muted-foreground">{t("moderator.card.modal.outstanding")}</p>
                         <p className="font-semibold">{selectedCard?.outstanding_fee ?? "0"}</p>
                       </div>
                       <div className="p-3 border rounded-lg bg-background flex flex-col justify-between">
-                        <p className="text-xs text-muted-foreground mb-1">Прогресс оплаты</p>
+                        <p className="text-xs text-muted-foreground mb-1">{t("moderator.card.modal.progress")}</p>
                         {(() => {
                           const total = Number(selectedCard?.total_fee || selectedCard?.total_amount || 0);
                           const paid = Number(selectedCard?.amount_paid || 0);
@@ -1126,14 +1126,14 @@ const ModeratorDashboard = () => {
 
                   {selectedCard?.anamnesis && (
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Анамнез</p>
+                      <p className="text-xs text-muted-foreground mb-1">{t("moderator.card.modal.anamnesis")}</p>
                       <div className="border rounded p-2 bg-muted/30 whitespace-pre-wrap text-sm">{selectedCard.anamnesis}</div>
                     </div>
                   )}
 
                   {selectedCard?.recommended_feed_text && (
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Рекомендованный корм врача</p>
+                      <p className="text-xs text-muted-foreground mb-1">{t("moderator.card.modal.recommendedFeed")}</p>
                       <div className="border rounded p-2 bg-muted/30 whitespace-pre-wrap text-sm">
                         {selectedCard.recommended_feed_text}
                       </div>
@@ -1143,39 +1143,39 @@ const ModeratorDashboard = () => {
                   {/* Fee breakdown */}
                   <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
                     <div className="p-3 border rounded-lg bg-background">
-                      <p className="text-xs text-muted-foreground">Всего (total_fee)</p>
+                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.feeTotal")}</p>
                       <p className="font-semibold">{selectedCard?.total_fee ?? selectedCard?.total_amount ?? selectedCard?.total ?? "—"}</p>
                     </div>
                     <div className="p-3 border rounded-lg bg-background">
-                      <p className="text-xs text-muted-foreground">Стационар (stationary_fee)</p>
+                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.feeStationary")}</p>
                       <p className="font-semibold">{selectedCard?.stationary_fee ?? selectedCard?.stationary_total ?? "—"}</p>
                     </div>
                     <div className="p-3 border rounded-lg bg-background">
-                      <p className="text-xs text-muted-foreground">Препараты (medicines_fee)</p>
+                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.feeMedicines")}</p>
                       <p className="font-semibold">{selectedCard?.medicines_fee ?? selectedCard?.medicines_total ?? "—"}</p>
                     </div>
                     <div className="p-3 border rounded-lg bg-background">
-                      <p className="text-xs text-muted-foreground">Услуги (services_fee)</p>
+                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.feeServices")}</p>
                       <p className="font-semibold">{selectedCard?.services_fee ?? selectedCard?.services_total ?? "—"}</p>
                     </div>
                   </div>
 
                   {/* Used services */}
                   <div>
-                    <p className="text-sm font-semibold mb-2">Использованные услуги ({cardServices.length})</p>
+                    <p className="text-sm font-semibold mb-2">{t("moderator.card.modal.servicesTitle")} ({cardServices.length})</p>
                     {itemsLoading ? (
-                      <p className="text-sm text-muted-foreground">Загрузка…</p>
+                      <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
                     ) : cardServices.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Нет услуг</p>
+                      <p className="text-sm text-muted-foreground">{t("doctor.edit.services.empty")}</p>
                     ) : (
                       <div className="border rounded-lg overflow-hidden">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Услуга</TableHead>
-                              <TableHead>Кол-во</TableHead>
-                              <TableHead>Цена</TableHead>
-                              <TableHead>Сумма</TableHead>
+                              <TableHead>{t("moderator.card.modal.servicesTable.service")}</TableHead>
+                              <TableHead>{t("moderator.card.modal.servicesTable.quantity")}</TableHead>
+                              <TableHead>{t("moderator.card.modal.servicesTable.price")}</TableHead>
+                              <TableHead>{t("moderator.card.modal.servicesTable.total")}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1201,20 +1201,20 @@ const ModeratorDashboard = () => {
 
                   {/* Used medicines */}
                   <div>
-                    <p className="text-sm font-semibold mb-2">Использованные препараты ({cardMedicines.length})</p>
+                    <p className="text-sm font-semibold mb-2">{t("moderator.card.modal.medicinesTitle")} ({cardMedicines.length})</p>
                     {itemsLoading ? (
-                      <p className="text-sm text-muted-foreground">Загрузка…</p>
+                      <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
                     ) : cardMedicines.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Нет препаратов</p>
+                      <p className="text-sm text-muted-foreground">{t("doctor.edit.medicines.empty")}</p>
                     ) : (
                       <div className="border rounded-lg overflow-hidden">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Препарат</TableHead>
-                              <TableHead>Кол-во</TableHead>
-                              <TableHead>Цена</TableHead>
-                              <TableHead>Сумма</TableHead>
+                              <TableHead>{t("moderator.card.modal.medicinesTable.medicine")}</TableHead>
+                              <TableHead>{t("moderator.card.modal.medicinesTable.quantity")}</TableHead>
+                              <TableHead>{t("moderator.card.modal.medicinesTable.price")}</TableHead>
+                              <TableHead>{t("moderator.card.modal.medicinesTable.total")}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1240,21 +1240,21 @@ const ModeratorDashboard = () => {
 
                   {/* Payments list */}
                   <div>
-                    <p className="text-sm font-semibold mb-2">Платежи ({payments.length})</p>
+                    <p className="text-sm font-semibold mb-2">{t("moderator.card.modal.paymentsTitle")} ({payments.length})</p>
                     {paymentsLoading ? (
-                      <p className="text-sm text-muted-foreground">Загрузка…</p>
+                      <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
                     ) : payments.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Платежей пока нет</p>
+                      <p className="text-sm text-muted-foreground">{t("moderator.card.modal.paymentsEmpty")}</p>
                     ) : (
                       <div className="border rounded-lg overflow-hidden">
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Дата</TableHead>
-                              <TableHead>Метод</TableHead>
-                              <TableHead>Сумма</TableHead>
-                              <TableHead>Комментарий</TableHead>
-                              <TableHead>Кем принят</TableHead>
+                              <TableHead>{t("moderator.card.modal.paymentsTable.date")}</TableHead>
+                              <TableHead>{t("moderator.card.modal.paymentsTable.method")}</TableHead>
+                              <TableHead>{t("moderator.card.modal.paymentsTable.amount")}</TableHead>
+                              <TableHead>{t("moderator.card.modal.paymentsTable.note")}</TableHead>
+                              <TableHead>{t("moderator.card.modal.paymentsTable.recordedBy")}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1278,7 +1278,7 @@ const ModeratorDashboard = () => {
                 <div className="space-y-4 pt-4 border-t mt-4">
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="paymentAmount">Сумма платежа</Label>
+                      <Label htmlFor="paymentAmount">{t("moderator.card.modal.paymentAmount")}</Label>
                       <Input
                         id="paymentAmount"
                         type="number"
@@ -1291,12 +1291,12 @@ const ModeratorDashboard = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Метод оплаты</Label>
+                      <Label>{t("moderator.card.modal.paymentMethod")}</Label>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {["CASH", "CLICK", "PAYME", "OTHER"].map((m) => {
                           const isActive = paymentMethod === m;
                           const label =
-                            m === "CASH" ? "Наличные" : m === "CLICK" ? "Click" : m === "PAYME" ? "Payme" : "Другое";
+                            m === "CASH" ? t("moderator.card.modal.paymentMethod.cash") : m === "CLICK" ? t("moderator.card.modal.paymentMethod.click") : m === "PAYME" ? t("moderator.card.modal.paymentMethod.payme") : t("moderator.card.modal.paymentMethod.other");
                           const imgSrc =
                             m === "CASH"
                               ? cashImg
@@ -1329,12 +1329,12 @@ const ModeratorDashboard = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="paymentNote">Комментарий (необязательно)</Label>
+                      <Label htmlFor="paymentNote">{t("moderator.card.modal.paymentNote")}</Label>
                       <Input
                         id="paymentNote"
                         value={paymentNote}
                         onChange={(e) => setPaymentNote(e.target.value)}
-                        placeholder="Например: первая часть платежа"
+                        placeholder={t("moderator.card.modal.paymentNotePlaceholder")}
                       />
                     </div>
                   </div>
@@ -1379,7 +1379,7 @@ const ModeratorDashboard = () => {
                         className="gap-2"
                       >
                         {confirmLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                        Полностью оплачен
+                        {t("moderator.card.modal.confirmFullPayment")}
                       </Button>
                       <Button
                         type="button"
@@ -1390,15 +1390,15 @@ const ModeratorDashboard = () => {
                           const amountNum = Number(paymentAmount);
                           const outstanding = Number(selectedCard?.outstanding_fee ?? selectedCard?.total_fee ?? 0) - Number(selectedCard?.amount_paid ?? 0);
                           if (!paymentAmount || isNaN(amountNum) || amountNum <= 0) {
-                            toast({ variant: "destructive", title: "Некорректная сумма", description: "Введите сумму больше нуля" });
+                            toast({ variant: "destructive", title: t("moderator.card.modal.paymentValidation.amountRequired"), description: t("moderator.card.modal.paymentValidation.amountRequiredDesc") });
                             return;
                           }
                           if (amountNum > outstanding && outstanding > 0) {
-                            toast({ variant: "destructive", title: "Сумма больше остатка", description: `Максимум: ${outstanding}` });
+                            toast({ variant: "destructive", title: t("moderator.card.modal.paymentValidation.amountExceeds"), description: `${t("moderator.card.modal.paymentValidation.amountExceeds")}: ${outstanding}` });
                             return;
                           }
                           if (!paymentMethod) {
-                            toast({ variant: "destructive", title: "Метод оплаты", description: "Выберите метод оплаты" });
+                            toast({ variant: "destructive", title: t("moderator.card.modal.paymentValidation.methodRequired"), description: t("moderator.card.modal.paymentValidation.methodRequiredDesc") });
                             return;
                           }
                           setPaymentSubmitting(true);
@@ -1412,21 +1412,21 @@ const ModeratorDashboard = () => {
                             await loadWaitingCards();
                             await loadPayments(Number(updated.id));
                             setPaymentAmount("");
-                            toast({ title: "Платеж принят" });
+                            toast({ title: t("moderator.card.modal.paymentSuccess") });
                           } catch (e: any) {
                             const data = e?.response?.data;
                             let msg = e?.message || t("common.error");
                             if (data && typeof data === "object") {
                               msg = Object.values(data as any).flat().join("; ");
                             }
-                            toast({ variant: "destructive", title: "Ошибка оплаты", description: msg });
+                            toast({ variant: "destructive", title: t("moderator.card.modal.paymentError"), description: msg });
                           } finally {
                             setPaymentSubmitting(false);
                           }
                         }}
                       >
                         {paymentSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                        Принять частичный платеж
+                        {t("moderator.card.modal.acceptPartialPayment")}
                       </Button>
                     </div>
                   </div>
@@ -1446,6 +1446,7 @@ export default ModeratorDashboard;
 
 const AddClientForm = () => {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     phone_number: "",
     password: "",
@@ -1485,11 +1486,11 @@ const AddClientForm = () => {
 
   const validatePhone = (value: string) => {
     if (!phoneRegex.test(value)) {
-      setPhoneError("Неверный формат телефона");
+      setPhoneError(t("moderator.addUser.phoneInvalid"));
       return false;
     }
     if (usedPhones && usedPhones.has(value)) {
-      setPhoneError("Этот номер уже используется");
+      setPhoneError(t("moderator.addUser.phoneUsed"));
       return false;
     }
     setPhoneError(null);
@@ -1499,11 +1500,11 @@ const AddClientForm = () => {
   const onSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!form.phone_number || !form.password) {
-      toast({ variant: "destructive", title: "Проверьте поля", description: "Телефон и пароль обязательны" });
+      toast({ variant: "destructive", title: t("moderator.addUser.validation.required"), description: t("moderator.addUser.validation.requiredDesc") });
       return;
     }
     if (!validatePhone(form.phone_number)) {
-      toast({ variant: "destructive", title: "Телефон некорректен", description: phoneError ?? "Проверьте номер телефона" });
+      toast({ variant: "destructive", title: t("moderator.addUser.validation.phoneInvalid"), description: phoneError ?? t("moderator.addUser.validation.phoneInvalidDesc") });
       return;
     }
     setSubmitting(true);
@@ -1516,12 +1517,12 @@ const AddClientForm = () => {
       if (form.first_name) payload.first_name = form.first_name;
       if (form.last_name) payload.last_name = form.last_name;
       const created = await Clients.create<any>(payload);
-      toast({ title: "Клиент создан", description: `ID: ${created?.id ?? "—"}` });
+      toast({ title: t("moderator.addUser.success"), description: `ID: ${created?.id ?? "—"}` });
   setForm({ phone_number: "", password: "", first_name: "", last_name: "" });
   setPhoneError(null);
     } catch (e: any) {
-      const msg = e?.response?.data?.detail || e?.message || "Не удалось создать клиента";
-      toast({ variant: "destructive", title: "Ошибка", description: String(msg) });
+      const msg = e?.response?.data?.detail || e?.message || t("moderator.addUser.errorDesc");
+      toast({ variant: "destructive", title: t("moderator.addUser.error"), description: String(msg) });
     } finally {
       setSubmitting(false);
     }
@@ -1532,10 +1533,10 @@ const AddClientForm = () => {
       <form className="space-y-4" onSubmit={onSubmit}>
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="phone_number">Телефон</Label>
+            <Label htmlFor="phone_number">{t("moderator.addUser.phone")}</Label>
             <Input
               id="phone_number"
-              placeholder="+998901234567"
+              placeholder={t("moderator.addUser.phonePlaceholder")}
               value={form.phone_number}
               onChange={(e) => {
                 const value = e.target.value;
@@ -1546,19 +1547,19 @@ const AddClientForm = () => {
               required
             />
             {checkingPhone && !usedPhones && (
-              <p className="text-xs text-muted-foreground">Проверка номера…</p>
+              <p className="text-xs text-muted-foreground">{t("moderator.addUser.checkingPhone")}</p>
             )}
             {phoneError && (
               <p className="text-xs text-red-500">{phoneError}</p>
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Пароль</Label>
+            <Label htmlFor="password">{t("moderator.addUser.password")}</Label>
             <div className="relative">
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Минимум 6 символов"
+                placeholder={t("moderator.addUser.passwordPlaceholder")}
                 value={form.password}
                 onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))}
                 required
@@ -1568,7 +1569,7 @@ const AddClientForm = () => {
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
-                aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+                aria-label={showPassword ? t("moderator.addUser.passwordHide") : t("moderator.addUser.passwordShow")}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -1577,7 +1578,7 @@ const AddClientForm = () => {
         </div>
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="first_name">Имя (необязательно)</Label>
+            <Label htmlFor="first_name">{t("moderator.addUser.firstName")}</Label>
             <Input
               id="first_name"
               value={form.first_name}
@@ -1585,7 +1586,7 @@ const AddClientForm = () => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="last_name">Фамилия (необязательно)</Label>
+            <Label htmlFor="last_name">{t("moderator.addUser.lastName")}</Label>
             <Input
               id="last_name"
               value={form.last_name}
@@ -1596,7 +1597,7 @@ const AddClientForm = () => {
         <div className="flex gap-2">
           <Button type="submit" disabled={submitting} className="gap-2">
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            Создать клиента
+            {t("moderator.addUser.submit")}
           </Button>
         </div>
       </form>

@@ -79,8 +79,35 @@ const DoctorDashboard = () => {
   interface ApiService { id: number; service_name?: string; name?: string; price?: string | number }
   interface ApiMedicine { id: number; medicine_name?: string; name?: string; price?: string | number; stock?: number; quantity?: number; unit?: string }
   interface ApiFeed { id: number; feed_name?: string; name?: string; price?: string | number }
-  interface ApiRoom { id: number; room_number: string; price_per_day?: string; description?: string; is_available: boolean }
-  interface ApiMedicalCard { id: number; pet?: number | string; doctor?: number; client?: number; diagnosis?: string; created_at?: string; status?: string; closed_at?: string; total_fee?: string; service_usages?: any[]; analyze?: string; general_condition?: string; chest_condition?: string; notes?: string; revisit_date?: string | null; stationary_room?: number | null; stay_start?: string | null; stay_end?: string | null }
+  interface ApiRoom { id: number; room_number: string; price_per_day?: string; hourly_price?: string | null; description?: string; is_available: boolean }
+  interface ApiMedicalCard {
+    id: number;
+    pet?: number | string;
+    doctor?: number;
+    client?: number;
+    diagnosis?: string;
+    created_at?: string;
+    status?: string;
+    closed_at?: string;
+    total_fee?: string;
+    service_usages?: any[];
+    analyze?: string;
+    general_condition?: string;
+    chest_condition?: string;
+    notes?: string;
+    revisit_date?: string | null;
+    recommended_feed_text?: string | null;
+    // Stationary
+    stationary_room?: number | null;
+    booking_type?: "DAILY" | "HOURLY" | null;
+    stay_start?: string | null;
+    stay_end?: string | null;
+    stay_days?: string | null;
+    hourly_start?: string | null;
+    hourly_end?: string | null;
+    stay_hours?: string | null;
+    stationary_fee?: string | null;
+  }
   interface ApiMedicalCardAttachment { id: number; medical_card?: number; type?: "XRAY" | "PRESCRIPTION" | "OTHER" | string; file: string; uploaded_by?: number; uploaded_at?: string }
   interface ApiServiceUsage { id: number; medical_card: number; service: number; service_name?: string; quantity: number; description?: string }
   interface ApiMedicineUsage { id: number; medical_card: number; medicine: number; name?: string; quantity: number; dosage: string }
@@ -150,11 +177,15 @@ const DoctorDashboard = () => {
   const [diagnosis, setDiagnosis] = useState("");
   const [analyses, setAnalyses] = useState("");
   const [revisitDate, setRevisitDate] = useState("");
+  const [recommendedFeedText, setRecommendedFeedText] = useState("");
   const [isStationary, setIsStationary] = useState(false);
+  const [bookingType, setBookingType] = useState<"DAILY" | "HOURLY">("DAILY");
   const [stationaryRoom, setStationaryRoom] = useState("");
   const [stationaryRoomLabel, setStationaryRoomLabel] = useState<string>("");
   const [stationaryStartDate, setStationaryStartDate] = useState("");
   const [stationaryReleaseDate, setStationaryReleaseDate] = useState("");
+  const [hourlyStartDateTime, setHourlyStartDateTime] = useState("");
+  const [hourlyEndDateTime, setHourlyEndDateTime] = useState("");
   // Required vitals & selections
   const [selectedPetId, setSelectedPetId] = useState<number | null>(null);
   const [bloodPressure, setBloodPressure] = useState("");
@@ -234,11 +265,15 @@ const DoctorDashboard = () => {
   const [editChest, setEditChest] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editRevisit, setEditRevisit] = useState("");
+  const [editRecommendedFeedText, setEditRecommendedFeedText] = useState("");
   const [editIsStationary, setEditIsStationary] = useState(false);
+  const [editBookingType, setEditBookingType] = useState<"DAILY" | "HOURLY">("DAILY");
   const [editStationaryRoom, setEditStationaryRoom] = useState<string>("");
   const [editStationaryRoomLabel, setEditStationaryRoomLabel] = useState<string>("");
   const [editStayStart, setEditStayStart] = useState("");
   const [editStayEnd, setEditStayEnd] = useState("");
+  const [editHourlyStart, setEditHourlyStart] = useState("");
+  const [editHourlyEnd, setEditHourlyEnd] = useState("");
   const [editFreeRoomsDialogOpen, setEditFreeRoomsDialogOpen] = useState(false);
   // Edit usages state
   type EditServiceUsageRow = { _localId: string; _new?: boolean; _deleted?: boolean; _dirty?: boolean } & Partial<ApiServiceUsage> & { service_name_fallback?: string };
@@ -278,14 +313,18 @@ const DoctorDashboard = () => {
       setEditChest(card.chest_condition || "");
       setEditNotes(card.notes || "");
       setEditRevisit(card.revisit_date ? (card.revisit_date as string).slice(0,10) : "");
+      setEditRecommendedFeedText(card.recommended_feed_text || "");
       setEditAttachments(card.attachments || []);
       setPendingAttachments([]);
-      const hasStationary = Boolean(card.stationary_room || card.stay_start || card.stay_end);
+      const hasStationary = Boolean(card.stationary_room || card.stay_start || card.stay_end || card.hourly_start || card.hourly_end);
       setEditIsStationary(hasStationary);
+      setEditBookingType((card.booking_type as any) || "DAILY");
       setEditStationaryRoom(card.stationary_room ? String(card.stationary_room) : "");
       setEditStayStart(card.stay_start ? String(card.stay_start).slice(0,10) : "");
-    setEditStayEnd(card.stay_end ? String(card.stay_end).slice(0,10) : "");
-    setEditStationaryRoomLabel(card.stationary_room ? t('doctor.room.fallback', { id: card.stationary_room }) : "");
+    	setEditStayEnd(card.stay_end ? String(card.stay_end).slice(0,10) : "");
+    	setEditHourlyStart(card.hourly_start ? String(card.hourly_start).slice(0,16) : "");
+    	setEditHourlyEnd(card.hourly_end ? String(card.hourly_end).slice(0,16) : "");
+    	setEditStationaryRoomLabel(card.stationary_room ? t('doctor.room.fallback', { id: card.stationary_room }) : "");
       // Load usages and catalogs in parallel
       setEditUsagesLoading(true); setEditUsagesError(null);
       Promise.all([
@@ -328,25 +367,57 @@ const DoctorDashboard = () => {
     if ((editSymptoms || '') !== (editOriginal.general_condition || '')) patch.general_condition = editSymptoms.trim();
     if ((editChest || '') !== (editOriginal.chest_condition || '')) patch.chest_condition = editChest.trim();
     if ((editNotes || '') !== (editOriginal.notes || '')) patch.notes = editNotes.trim();
+    if ((editRecommendedFeedText || '') !== (editOriginal.recommended_feed_text || '')) {
+      patch.recommended_feed_text = editRecommendedFeedText.trim();
+    }
     const newRevisitIso = editRevisit ? new Date(editRevisit).toISOString() : null;
     const oldRevisit = editOriginal.revisit_date ?? null;
     if ((newRevisitIso || null) !== (oldRevisit || null)) patch.revisit_date = newRevisitIso;
 
-    const origHasStationary = Boolean(editOriginal.stationary_room || editOriginal.stay_start || editOriginal.stay_end);
+    const origHasStationary = Boolean(
+      editOriginal.stationary_room ||
+      editOriginal.stay_start ||
+      editOriginal.stay_end ||
+      editOriginal.hourly_start ||
+      editOriginal.hourly_end
+    );
+
     if (editIsStationary) {
-      if (!editStationaryRoom || !editStayStart || !editStayEnd) {
+      if (!editStationaryRoom) {
         toast({ title: t('doctor.edit.stationaryRequiredTitle'), description: t('doctor.edit.stationaryRequiredDescription'), variant: 'destructive' });
         return;
       }
-      // Always send trio when in stationary mode
+
       patch.stationary_room = Number(editStationaryRoom);
-      patch.stay_start = editStayStart;
-      patch.stay_end = editStayEnd;
+      patch.booking_type = editBookingType;
+
+      if (editBookingType === "DAILY") {
+        if (!editStayStart || !editStayEnd) {
+          toast({ title: t('doctor.edit.stationaryRequiredTitle'), description: t('doctor.edit.stationaryRequiredDescription'), variant: 'destructive' });
+          return;
+        }
+        patch.stay_start = editStayStart;
+        patch.stay_end = editStayEnd;
+        patch.hourly_start = null;
+        patch.hourly_end = null;
+      } else {
+        if (!editHourlyStart || !editHourlyEnd) {
+          toast({ title: t('doctor.edit.stationaryRequiredTitle'), description: t('doctor.edit.stationaryRequiredDescription'), variant: 'destructive' });
+          return;
+        }
+        patch.hourly_start = new Date(editHourlyStart).toISOString();
+        patch.hourly_end = new Date(editHourlyEnd).toISOString();
+        patch.stay_start = null;
+        patch.stay_end = null;
+      }
     } else if (origHasStationary) {
-      // Clearing stationary: send trio as nulls
+      // Clearing stationary: send all related fields as nulls
       patch.stationary_room = null;
+      patch.booking_type = null;
       patch.stay_start = null;
       patch.stay_end = null;
+      patch.hourly_start = null;
+      patch.hourly_end = null;
     }
 
     if (Object.keys(patch).length === 0) {
@@ -427,19 +498,40 @@ const DoctorDashboard = () => {
       if (pendingAttachments.length && editCardId) {
         try {
           setAttachmentsUploading(true);
-          const form = new FormData();
+          const createdAll: any[] = [];
+
+          // Backend accepts multiple files via files/types lists, but
+          // sending one file per request avoids partial failures and
+          // makes error handling clearer.
           for (const att of pendingAttachments) {
+            const form = new FormData();
             form.append("files", att.file);
             form.append("types", att.type);
+
+            try {
+              const { data } = await api.post(`medical-cards/${editCardId}/attachments/`, form, {
+                headers: { "Content-Type": "multipart/form-data" },
+              });
+              if (Array.isArray(data)) {
+                createdAll.push(...data);
+              } else if (data) {
+                createdAll.push(data);
+              }
+            } catch (e: any) {
+              // Surface backend validation errors (size/type/etc.)
+              const message = e?.response?.data || e?.message;
+              toast({
+                title: t('doctor.edit.attachments.uploadError', { defaultValue: 'Не удалось загрузить вложения' }),
+                description: typeof message === 'string' ? message : JSON.stringify(message),
+                variant: 'destructive',
+              });
+            }
           }
-          const { data } = await api.post(`medical-cards/${editCardId}/attachments/`, form, {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
-          const created = Array.isArray(data) ? data as any[] : [data];
-          setEditAttachments(prev => [...prev, ...created as any]);
+
+          if (createdAll.length) {
+            setEditAttachments(prev => [...prev, ...createdAll]);
+          }
           setPendingAttachments([]);
-        } catch (e:any) {
-          toast({ title: t('doctor.edit.attachments.uploadError', { defaultValue: 'Не удалось загрузить вложения' }), description: e?.message, variant: 'destructive' });
         } finally {
           setAttachmentsUploading(false);
         }
@@ -716,7 +808,7 @@ const DoctorDashboard = () => {
 
   const resetCreateCardForm = () => {
   setWeight(""); setTemperature("");
-    setSymptoms(""); setDiagnosis(""); setAnalyses(""); setRevisitDate("");
+    setSymptoms(""); setDiagnosis(""); setAnalyses(""); setRevisitDate(""); setRecommendedFeedText("");
   setIsStationary(false); setStationaryRoom(""); setStationaryRoomLabel(""); setStationaryStartDate(""); setStationaryReleaseDate("");
   setFreeRoomsData([]); setFreeRoomsError(null);
     setSelectedServices({}); setSelectedMedicines({}); setSelectedFeeds({});
@@ -873,12 +965,24 @@ const DoctorDashboard = () => {
       respiratory_rate: rrNum,
       body_temperature: tempNum,
       revisit_date: revisitDate ? new Date(revisitDate).toISOString() : null,
+      recommended_feed_text: recommendedFeedText.trim() || undefined,
       status: 'OPEN',
     };
-    if (isStationary) {
-      payload.stationary_room = stationaryRoom ? Number(stationaryRoom) : undefined;
-      payload.stay_start = stationaryStartDate || null;
-      payload.stay_end = stationaryReleaseDate || null;
+    if (isStationary && stationaryRoom) {
+      payload.stationary_room = Number(stationaryRoom);
+      payload.booking_type = bookingType;
+
+      if (bookingType === "DAILY") {
+        payload.stay_start = stationaryStartDate || null;
+        payload.stay_end = stationaryReleaseDate || null;
+        payload.hourly_start = null;
+        payload.hourly_end = null;
+      } else {
+        payload.stay_start = null;
+        payload.stay_end = null;
+        payload.hourly_start = hourlyStartDateTime ? new Date(hourlyStartDateTime).toISOString() : null;
+        payload.hourly_end = hourlyEndDateTime ? new Date(hourlyEndDateTime).toISOString() : null;
+      }
     }
     let createdCard: ApiMedicalCard | null = null;
     try {
@@ -922,6 +1026,33 @@ const DoctorDashboard = () => {
       }).catch(() => null));
     await Promise.allSettled([...servicePosts, ...medicinePosts]);
 
+    // Upload attachments chosen during card creation
+    if (newCardAttachments.length) {
+      const createdAll: any[] = [];
+      for (const att of newCardAttachments) {
+        const form = new FormData();
+        form.append("files", att.file);
+        form.append("types", att.type);
+        try {
+          const { data } = await api.post(`medical-cards/${cardId}/attachments/`, form, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+          if (Array.isArray(data)) {
+            createdAll.push(...data);
+          } else if (data) {
+            createdAll.push(data);
+          }
+        } catch (e: any) {
+          const message = e?.response?.data || e?.message;
+          toast({
+            title: t('doctor.edit.attachments.uploadError', { defaultValue: 'Не удалось загрузить вложения' }),
+            description: typeof message === 'string' ? message : JSON.stringify(message),
+            variant: 'destructive',
+          });
+        }
+      }
+    }
+
     // Refresh client cards list
     try {
       const { data } = await api.get(`medical-cards/by-user/${Number(selectedClient.id)}/`);
@@ -933,7 +1064,7 @@ const DoctorDashboard = () => {
     }
 
     setCreateCardDialogOpen(false);
-  toast({ title: t('doctor.create.successTitle'), description: t('doctor.create.successDescription', { id: cardId }) });
+  	toast({ title: t('doctor.create.successTitle'), description: t('doctor.create.successDescription', { id: cardId }) });
 
     // Open schedule/task modal right after card creation
     setScheduleForCardId(cardId);
@@ -1578,24 +1709,24 @@ const DoctorDashboard = () => {
 
   {/* Dashboard Tabs */}
         <Tabs defaultValue="clients" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8 h-auto p-1">
-            <TabsTrigger value="clients" className="gap-2 py-3">
+          <TabsList className="w-full mb-8 h-auto p-1 rounded-xl bg-muted/40 flex flex-wrap gap-2 overflow-x-auto">
+            <TabsTrigger value="clients" className="gap-2 py-3 px-3 text-sm flex items-center justify-center flex-shrink-0">
               <Users className="w-4 h-4" />
               {t('doctor.tabs.clients')}
             </TabsTrigger>
-            <TabsTrigger value="services-list" className="gap-2 py-3">
+            <TabsTrigger value="services-list" className="gap-2 py-3 px-3 text-sm flex items-center justify-center flex-shrink-0">
               <Package className="w-4 h-4" />
               {t('doctor.tabs.services')}
             </TabsTrigger>
-            <TabsTrigger value="medicines-list" className="gap-2 py-3">
+            <TabsTrigger value="medicines-list" className="gap-2 py-3 px-3 text-sm flex items-center justify-center flex-shrink-0">
               <Pill className="w-4 h-4" />
               {t('doctor.tabs.medicines')}
             </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2 py-3">
+            <TabsTrigger value="history" className="gap-2 py-3 px-3 text-sm flex items-center justify-center flex-shrink-0">
               <FileText className="w-4 h-4" />
               {t('doctor.tabs.history')}
             </TabsTrigger>
-            <TabsTrigger value="rooms" className="gap-2 py-3">
+            <TabsTrigger value="rooms" className="gap-2 py-3 px-3 text-sm flex items-center justify-center flex-shrink-0">
               <BedDouble className="w-4 h-4" />
               {t('doctor.tabs.rooms')}
             </TabsTrigger>
@@ -1907,6 +2038,16 @@ const DoctorDashboard = () => {
                         <Input id="revisit" type="date" min={todayStr} value={revisitDate} onChange={(e) => setRevisitDate(e.target.value)} />
                       </div>
 
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="recommended_feed">Рекомендованный корм</Label>
+                        <Textarea
+                          id="recommended_feed"
+                          value={recommendedFeedText}
+                          onChange={(e) => setRecommendedFeedText(e.target.value)}
+                          placeholder={t("doctor.feed.recommendationPlaceholder")}
+                        />
+                      </div>
+
                       {/* Attachments upload area (X-rays & prescriptions) */}
                       <div className="md:col-span-2 mt-4">
                         <div
@@ -2135,16 +2276,46 @@ const DoctorDashboard = () => {
                                 <div className="text-xs text-muted-foreground">{t('doctor.stationary.roomIdNote', { id: stationaryRoom })}</div>
                               )}
                             </div>
-                            <div className="grid md:grid-cols-2 gap-3">
-                              <div className="space-y-2">
-                              <Label htmlFor="start">{t('doctor.stationary.startDate')}</Label>
-                              <Input id="start" type="date" min={todayStr} value={stationaryStartDate} onChange={(e) => setStationaryStartDate(e.target.value)} />
+                            {stationaryRoom && (
+                              <div className="space-y-3">
+                                <div className="space-y-2">
+                                  <Label>{t('doctor.stationary.bookingType')}</Label>
+                                  <Select value={bookingType} onValueChange={(val: "DAILY" | "HOURLY") => setBookingType(val)}>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder={t('doctor.stationary.bookingTypePlaceholder')} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="DAILY">{t('doctor.stationary.typeDaily')}</SelectItem>
+                                      <SelectItem value="HOURLY">{t('doctor.stationary.typeHourly')}</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                {bookingType === "DAILY" ? (
+                                  <div className="grid md:grid-cols-2 gap-3">
+                                    <div className="space-y-2">
+                                      <Label htmlFor="start">{t('doctor.stationary.startDate')}</Label>
+                                      <Input id="start" type="date" min={todayStr} value={stationaryStartDate} onChange={(e) => setStationaryStartDate(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label htmlFor="release">{t('doctor.stationary.endDate')}</Label>
+                                      <Input id="release" type="date" min={todayStr} value={stationaryReleaseDate} onChange={(e) => setStationaryReleaseDate(e.target.value)} />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="grid md:grid-cols-2 gap-3">
+                                    <div className="space-y-2">
+                                      <Label htmlFor="start_dt">{t('doctor.stationary.startDateTime')}</Label>
+                                      <Input id="start_dt" type="datetime-local" value={hourlyStartDateTime} onChange={(e) => setHourlyStartDateTime(e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label htmlFor="end_dt">{t('doctor.stationary.endDateTime')}</Label>
+                                      <Input id="end_dt" type="datetime-local" value={hourlyEndDateTime} onChange={(e) => setHourlyEndDateTime(e.target.value)} />
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                              <div className="space-y-2">
-                              <Label htmlFor="release">{t('doctor.stationary.endDate')}</Label>
-                              <Input id="release" type="date" min={todayStr} value={stationaryReleaseDate} onChange={(e) => setStationaryReleaseDate(e.target.value)} />
-                              </div>
-                            </div>
+                            )}
                           </div>
                         )}
                       </CardContent>
@@ -2494,6 +2665,16 @@ const DoctorDashboard = () => {
                   <Input id="ed_revisit" type="date" min={todayStr} value={editRevisit} onChange={(e) => setEditRevisit(e.target.value)} />
                 </div>
 
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="ed_recommended_feed">Рекомендованный корм</Label>
+                  <Textarea
+                    id="ed_recommended_feed"
+                    value={editRecommendedFeedText}
+                    onChange={(e) => setEditRecommendedFeedText(e.target.value)}
+                    placeholder="Например: JOSERA Catelux, 0.5 кг в день на 14 дней"
+                  />
+                </div>
+
                 <div className="md:col-span-2">
                   <Card className="border-2">
                     <CardHeader>
@@ -2523,16 +2704,46 @@ const DoctorDashboard = () => {
                               <div className="text-xs text-muted-foreground">{t('doctor.stationary.roomIdNote', { id: editStationaryRoom })}</div>
                             )}
                           </div>
-                          <div className="grid md:grid-cols-2 gap-3">
-                            <div className="space-y-2">
-                              <Label htmlFor="ed_start">{t('doctor.stationary.startDate')}</Label>
-                              <Input id="ed_start" type="date" min={todayStr} value={editStayStart} onChange={(e) => setEditStayStart(e.target.value)} />
+                          {editStationaryRoom && (
+                            <div className="space-y-3">
+                              <div className="space-y-2">
+                                <Label>{t('doctor.stationary.bookingType')}</Label>
+                                <Select value={editBookingType} onValueChange={(val: "DAILY" | "HOURLY") => setEditBookingType(val)}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder={t('doctor.stationary.bookingTypePlaceholder')} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="DAILY">{t('doctor.stationary.typeDaily')}</SelectItem>
+                                    <SelectItem value="HOURLY">{t('doctor.stationary.typeHourly')}</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              {editBookingType === "DAILY" ? (
+                                <div className="grid md:grid-cols-2 gap-3">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="ed_start">{t('doctor.stationary.startDate')}</Label>
+                                    <Input id="ed_start" type="date" min={todayStr} value={editStayStart} onChange={(e) => setEditStayStart(e.target.value)} />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="ed_end">{t('doctor.stationary.endDate')}</Label>
+                                    <Input id="ed_end" type="date" min={todayStr} value={editStayEnd} onChange={(e) => setEditStayEnd(e.target.value)} />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="grid md:grid-cols-2 gap-3">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="ed_start_dt">{t('doctor.stationary.startDateTime')}</Label>
+                                    <Input id="ed_start_dt" type="datetime-local" value={editHourlyStart} onChange={(e) => setEditHourlyStart(e.target.value)} />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="ed_end_dt">{t('doctor.stationary.endDateTime')}</Label>
+                                    <Input id="ed_end_dt" type="datetime-local" value={editHourlyEnd} onChange={(e) => setEditHourlyEnd(e.target.value)} />
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="ed_end">{t('doctor.stationary.endDate')}</Label>
-                              <Input id="ed_end" type="date" min={todayStr} value={editStayEnd} onChange={(e) => setEditStayEnd(e.target.value)} />
-                            </div>
-                          </div>
+                          )}
                         </div>
                       )}
                     </CardContent>
@@ -2693,7 +2904,7 @@ const DoctorDashboard = () => {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="attachments-input">{t('doctor.edit.attachments.add', { defaultValue: 'Добавить вложения' })}</Label>
+                        <Label htmlFor="attachments-input">{t('doctor.edit.attachments.add')}</Label>
                         <Input
                           id="attachments-input"
                           type="file"

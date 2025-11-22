@@ -144,10 +144,10 @@ export const PetsManager = ({ userId, role = "CLIENT" }: { userId: string | numb
 
   const getAnimalTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      dog: "🐕 Собака",
-      cat: "🐈 Кошка",
-      bird: "🦜 Птица",
-      other: "🐾 Другое"
+      dog: t("client.pets.animalType.dog"),
+      cat: t("client.pets.animalType.cat"),
+      bird: t("client.pets.animalType.bird"),
+      other: t("client.pets.animalType.other")
     };
     return labels[type] || type;
   };
@@ -252,7 +252,7 @@ export const PetsManager = ({ userId, role = "CLIENT" }: { userId: string | numb
                 <div className="grid gap-2 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="color">{t("client.pets.color.label")}</Label>
-                    <Input id="color" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} placeholder="Рыжий" />
+                    <Input id="color" value={formData.color} onChange={(e) => setFormData({ ...formData, color: e.target.value })} placeholder={t("client.pets.colorPlaceholder")} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="weight">{t("client.pets.weight.label")}</Label>
@@ -262,7 +262,7 @@ export const PetsManager = ({ userId, role = "CLIENT" }: { userId: string | numb
 
                 <div className="space-y-2">
                   <Label htmlFor="description">{t("client.pets.notes.label")}</Label>
-                  <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Особенности, аллергии..." rows={3} />
+                  <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder={t("client.pets.descriptionPlaceholder")} rows={3} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="image">{t("client.pets.photo.label")}</Label>

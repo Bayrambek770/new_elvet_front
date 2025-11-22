@@ -36,7 +36,7 @@ const AdminDashboard = () => {
             type="button"
             onClick={() => navigate("/")}
             className="flex items-center gap-3 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary transition hover:opacity-90"
-            aria-label="Вернуться на главную"
+            aria-label={t("admin.banner.goHome")}
           >
             <img src={elvetLogo} alt="ELVET" className="w-12 h-12 rounded-xl object-cover border border-white/30" />
             <div className="text-left">
@@ -63,8 +63,8 @@ const AdminDashboard = () => {
           <h2 className="text-3xl font-semibold text-foreground">{t("dashboard.admin")}</h2>
           <p className="text-muted-foreground">
             {adminRedirectUrl
-              ? "Для управления системой используйте административную панель ELVET."
-              : "URL панели администратора не настроен. Обратитесь к разработчику."}
+              ? t("admin.message.useAdminPanel")
+              : t("admin.message.urlNotConfigured")}
           </p>
         </div>
         <Button
@@ -74,7 +74,7 @@ const AdminDashboard = () => {
           disabled={!adminRedirectUrl}
         >
           <ExternalLink className="w-5 h-5" />
-          ELVET ADMIN
+          {t("admin.button.openAdmin")}
         </Button>
       </main>
     </div>

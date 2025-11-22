@@ -307,7 +307,7 @@ const NurseDashboard = () => {
       item?.title ||
       item?.medicine_name ||
       item?.product_name ||
-      (item?.id ? `Позиция #${item.id}` : "Без названия");
+      (item?.id ? t("nurse.medicines.itemFallback", { id: item.id }) : t("nurse.medicines.untitled"));
 
     const normalizeCategory = (item: any) =>
       item?.category ||
@@ -611,10 +611,10 @@ const NurseDashboard = () => {
         </div>
 
         <Tabs defaultValue="procedures" className="w-full">
-          <TabsList className="w-full mb-8 h-auto p-1 rounded-2xl bg-card/80 shadow-md grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          <TabsList className="w-full mb-8 h-auto p-1 rounded-2xl bg-card/80 shadow-md flex flex-wrap gap-2 overflow-x-auto">
             <TabsTrigger
               value="procedures"
-              className="gap-2 py-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all"
+              className="gap-2 py-3 px-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all flex items-center justify-center flex-shrink-0"
             >
               <ClipboardList className="w-4 h-4" />
               <span className="hidden sm:inline">{t("nurse.tabs.procedures")}</span>
@@ -622,7 +622,7 @@ const NurseDashboard = () => {
             </TabsTrigger>
             <TabsTrigger
               value="medicines"
-              className="gap-2 py-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all"
+              className="gap-2 py-3 px-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all flex items-center justify-center flex-shrink-0"
             >
               <Pill className="w-4 h-4" />
               <span className="hidden sm:inline">{t("nurse.tabs.medicines")}</span>
@@ -630,7 +630,7 @@ const NurseDashboard = () => {
             </TabsTrigger>
             <TabsTrigger
               value="schedule"
-              className="gap-2 py-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all"
+              className="gap-2 py-3 px-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all flex items-center justify-center flex-shrink-0"
             >
               <Calendar className="w-4 h-4" />
               <span className="hidden sm:inline">{t("nurse.tabs.schedule")}</span>
@@ -638,7 +638,7 @@ const NurseDashboard = () => {
             </TabsTrigger>
             <TabsTrigger
               value="salary"
-              className="gap-2 py-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-fuchsia-500 data-[state=active]:to-pink-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all"
+              className="gap-2 py-3 px-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-fuchsia-500 data-[state=active]:to-pink-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all flex items-center justify-center flex-shrink-0"
             >
               <Wallet className="w-4 h-4" />
               <span className="hidden sm:inline">{t("nurse.tabs.salaryHistory")}</span>
@@ -646,11 +646,11 @@ const NurseDashboard = () => {
             </TabsTrigger>
             <TabsTrigger
               value="nurse-care"
-              className="gap-2 py-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-rose-500 data-[state=active]:to-red-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all"
+              className="gap-2 py-3 px-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-rose-500 data-[state=active]:to-red-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all flex items-center justify-center flex-shrink-0"
             >
               <ClipboardList className="w-4 h-4" />
-              <span className="hidden sm:inline">Nurse Care 💗</span>
-              <span className="sm:hidden">Nurse 💗</span>
+              <span className="hidden sm:inline">{t("nurse.tabs.nurseCare")}</span>
+              <span className="sm:hidden">{t("nurse.tabs.nurseCareShort")}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -759,7 +759,7 @@ const NurseDashboard = () => {
                               className="flex flex-wrap items-center justify-between gap-4 rounded-lg bg-background/90 p-4 shadow-sm"
                             >
                               <div>
-                                <p className="font-medium text-foreground">{task.title === 'Без названия' ? t('nurse.task.untitled') : task.title}</p>
+                                <p className="font-medium text-foreground">{task.title === t('nurse.medicines.untitled') ? t('nurse.task.untitled') : task.title}</p>
                                 <p className="text-sm text-muted-foreground">
                                   {task.petName} · {task.serviceName}
                                 </p>
