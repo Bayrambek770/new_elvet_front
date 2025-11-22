@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +30,8 @@ export const ProfileEditor = ({ user }: { user: MeResponse }) => {
   const [extra1Error, setExtra1Error] = useState<string | null>(null);
   const [extra2Error, setExtra2Error] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(user?.image ?? null);
+  const extra1InputRef = useRef<HTMLInputElement>(null);
+  const extra2InputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const p = (user?.profile as ClientProfile | undefined) || {};
@@ -106,6 +108,36 @@ export const ProfileEditor = ({ user }: { user: MeResponse }) => {
     }
   };
 
+  // Validate phone number format
+  const validatePhone = (value: string): boolean => {
+    if (!value) return true; // Optional field
+    const normalized = normalizePhone(value);
+    return phoneRegex.test(normalized);
+  };
+
+  // Handle invalid event for Safari compatibility
+  const handleExtra1Invalid = (e: React.InvalidEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const value = input.value;
+    
+    if (value && !validatePhone(value)) {
+      input.setCustomValidity(t("client.profile.phoneInvalid") || "Please enter a valid phone number");
+    } else {
+      input.setCustomValidity("");
+    }
+  };
+
+  const handleExtra2Invalid = (e: React.InvalidEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const value = input.value;
+    
+    if (value && !validatePhone(value)) {
+      input.setCustomValidity(t("client.profile.phoneInvalid") || "Please enter a valid phone number");
+    } else {
+      input.setCustomValidity("");
+    }
+  };
+
   return (
     <Card className="border-0 shadow-elegant overflow-hidden hover:shadow-glow transition-all">
       <div className="bg-gradient-card border-b p-6">
@@ -162,15 +194,23 @@ export const ProfileEditor = ({ user }: { user: MeResponse }) => {
                 <div className="space-y-2">
                   <Label htmlFor="extra_number1" className="text-base font-medium">{t("client.profile.extraPhone1")}</Label>
                   <Input
+                    ref={extra1InputRef}
                     id="extra_number1"
+                    type="tel"
                     inputMode="tel"
-                    pattern="^\\+?\\d{8,15}$"
+                    pattern="^\+?[0-9]{8,15}$"
                     placeholder={t("client.profile.phonePlaceholder")}
                     value={formData.extra_number1}
                     onChange={(e) => {
                       const val = e.target.value;
                       const v = val;
                       setFormData({ ...formData, extra_number1: v });
+                      
+                      // Clear custom validity when user types
+                      if (extra1InputRef.current) {
+                        extra1InputRef.current.setCustomValidity("");
+                      }
+                      
                       if (!v) {
                         setExtra1Error(null);
                       } else if (!phoneRegex.test(normalizePhone(v))) {
@@ -181,6 +221,7 @@ export const ProfileEditor = ({ user }: { user: MeResponse }) => {
                         setExtra1Error(null);
                       }
                     }}
+                    onInvalid={handleExtra1Invalid}
                     className="h-12"
                   />
                   <p className={`text-xs ${extra1Error ? "text-destructive" : "text-muted-foreground"}`}>{extra1Error || t("client.profile.phone.helper")}</p>
@@ -188,15 +229,23 @@ export const ProfileEditor = ({ user }: { user: MeResponse }) => {
                 <div className="space-y-2">
                   <Label htmlFor="extra_number2" className="text-base font-medium">{t("client.profile.extraPhone2")}</Label>
                   <Input
+                    ref={extra2InputRef}
                     id="extra_number2"
+                    type="tel"
                     inputMode="tel"
-                    pattern="^\\+?\\d{8,15}$"
+                    pattern="^\+?[0-9]{8,15}$"
                     placeholder={t("client.profile.phonePlaceholder")}
                     value={formData.extra_number2}
                     onChange={(e) => {
                       const val = e.target.value;
                       const v = val;
                       setFormData({ ...formData, extra_number2: v });
+                      
+                      // Clear custom validity when user types
+                      if (extra2InputRef.current) {
+                        extra2InputRef.current.setCustomValidity("");
+                      }
+                      
                       if (!v) {
                         setExtra2Error(null);
                       } else if (!phoneRegex.test(normalizePhone(v))) {
@@ -207,6 +256,7 @@ export const ProfileEditor = ({ user }: { user: MeResponse }) => {
                         setExtra2Error(null);
                       }
                     }}
+                    onInvalid={handleExtra2Invalid}
                     className="h-12"
                   />
                   <p className={`text-xs ${extra2Error ? "text-destructive" : "text-muted-foreground"}`}>{extra2Error || t("client.profile.phone.helper")}</p>
