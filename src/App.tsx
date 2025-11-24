@@ -22,7 +22,12 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <Suspense fallback={<div className="p-6 text-center">Loading...</div>}>
           <Routes>
             <Route path="/" element={<Landing />} />

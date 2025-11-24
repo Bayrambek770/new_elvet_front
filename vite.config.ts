@@ -15,4 +15,11 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    sourcemap: true,
+  },
+  // Suppress source map errors from browser extensions
+  optimizeDeps: {
+    exclude: [],
+  },
 }));

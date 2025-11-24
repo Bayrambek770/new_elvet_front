@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { usePetFeeds, useCreateFeedSale, useFeedSales, usePayFeedSale, useMe } from "@/hooks/api";
+import { usePetFeeds, useCreateFeedSale, useFeedSales, useMe } from "@/hooks/api";
 import FeedSaleDetail from "@/components/moderator/FeedSaleDetail";
 import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,18 +18,41 @@ type DraftItem = {
 
 export const FeedSalesManager = () => {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const { data: me } = useMe();
   const { data: feeds } = usePetFeeds();
   const { data: sales } = useFeedSales();
   const createSale = useCreateFeedSale();
-  const paySale = usePayFeedSale();
+
+  // Helper function to get payment status and button variant for feed sales
+  const getFeedSaleStatus = (sale: any) => {
+    const status = (sale?.status || "").toString().toUpperCase();
+    
+    if (status === "PAID") {
+      return {
+        label: "Оплачено",
+        className: "bg-green-500 hover:bg-green-600 text-white border-green-500"
+      };
+    }
+    
+    if (status === "PARTLY_PAID" || status === "PARTLY") {
+      return {
+        label: "Частично оплачено",
+        className: "bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500"
+      };
+    }
+    
+    // Default: Waiting for Payment
+    return {
+      label: "Ожидает оплаты",
+      className: "bg-red-500 hover:bg-red-600 text-white border-red-500"
+    };
+  };
 
   const [clientId, setClientId] = useState("");
   const [petId, setPetId] = useState("");
   const [items, setItems] = useState<DraftItem[]>([{ feedId: "", quantityKg: "" }]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [selectedSaleId, setSelectedSaleId] = useState<number | null>(null);
   const [detailSaleId, setDetailSaleId] = useState<number | null>(null);
 
   const addItemRow = () => setItems([...items, { feedId: "", quantityKg: "" }]);
@@ -78,25 +102,6 @@ export const FeedSalesManager = () => {
     );
   };
 
-  const handlePay = () => {
-    if (!selectedSaleId || !paymentAmount) return;
-
-    paySale.mutate(
-      { id: selectedSaleId, amount: paymentAmount },
-      {
-        onSuccess: () => {
-          toast({ title: "Оплата зафиксирована" });
-          setPaymentAmount("");
-          setSelectedSaleId(null);
-        },
-        onError: (error: any) => {
-          const data = error?.response?.data as any;
-          const firstError = data?.amount || data?.detail || "Не удалось провести оплату";
-          toast({ variant: "destructive", title: "Ошибка", description: String(firstError) });
-        },
-      }
-    );
-  };
 
   const computeLineTotal = (item: DraftItem) => {
     const feed = feeds?.find((f: any) => String(f.id) === item.feedId) as any;
@@ -208,7 +213,14 @@ export const FeedSalesManager = () => {
       <CardContent>
         {!sales || sales.length === 0 ? (
           <div>Продажи кормов пока не созданы</div>
-        ) : (
+        ) : (() => {
+          const unpaidSales = sales.filter((sale: any) => {
+            const status = (sale?.status || "").toString().toUpperCase();
+            return status !== "PAID";
+          });
+          return unpaidSales.length === 0 ? (
+            <div>Нет неоплаченных продаж</div>
+          ) : (
           <div className="space-y-4">
             <Table>
               <TableHeader>
@@ -223,56 +235,46 @@ export const FeedSalesManager = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sales.map((sale: any) => (
+                {unpaidSales.map((sale: any) => (
                   <TableRow key={sale.id}>
                     <TableCell>{sale.id}</TableCell>
                     <TableCell>{sale.client}</TableCell>
                     <TableCell>{sale.pet}</TableCell>
-                    <TableCell>{sale.status}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const statusInfo = getFeedSaleStatus(sale);
+                        return (
+                          <Button
+                            size="sm"
+                            className={statusInfo.className}
+                            onClick={() => setDetailSaleId(sale.id)}
+                          >
+                            {statusInfo.label}
+                          </Button>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>{sale.amount_paid}</TableCell>
                     <TableCell>{sale.total_amount}</TableCell>
                     <TableCell>
-                      {sale.status === "PAID" ? (
-                        <span className="text-xs text-muted-foreground">Оплачено полностью</span>
-                      ) : (
-                        <div className="flex gap-2">
-                          <Input
-                            className="h-8 w-24"
-                            placeholder="Сумма"
-                            value={selectedSaleId === sale.id ? paymentAmount : ""}
-                            onChange={(e) => {
-                              setSelectedSaleId(sale.id);
-                              setPaymentAmount(e.target.value);
-                            }}
-                          />
-                          <Button
-                            size="sm"
-                            onClick={handlePay}
-                            disabled={paySale.isPending || selectedSaleId !== sale.id}
-                          >
-                            Оплатить
-                          </Button>
-                        </div>
-                      )}
-                      <div className="mt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setDetailSaleId(sale.id)}
-                        >
-                          Детали
-                        </Button>
-                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDetailSaleId(sale.id)}
+                      >
+                        Детали
+                      </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  ))}
               </TableBody>
             </Table>
             {detailSaleId && (
               <FeedSaleDetail saleId={detailSaleId} />
             )}
           </div>
-        )}
+          );
+        })()}
       </CardContent>
     </Card>
   );

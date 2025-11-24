@@ -7,10 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Heart, LogOut, User, Image as ImageIcon, Loader2, ExternalLink, Eye, EyeOff } from "lucide-react";
-import cashImg from "@/assets/cost.png";
-import clickImg from "@/assets/click-logo.png";
-import paymeImg from "@/assets/payme-logo.png";
-import otherImg from "@/assets/other.png";
+import cashImg from "@/assets/Cash.png";
+import cardImg from "@/assets/Card.png";
+import transferImg from "@/assets/Transfer.png";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -38,7 +37,7 @@ const ModeratorDashboard = () => {
   const isPublic = new URLSearchParams(location.search).get("public") === "1";
   const { toast } = useToast();
   const { t } = useTranslation();
-  const { data: me } = useMe();
+  const { data: me, isLoading: meLoading, error: meError, refetch: refetchMe } = useMe();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [bannerUploading, setBannerUploading] = useState(false);
@@ -56,7 +55,7 @@ const ModeratorDashboard = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CLICK" | "PAYME" | "OTHER" | "">("");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "CARD" | "TRANSFER" | "">("");
   const [paymentNote, setPaymentNote] = useState<string>("");
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
 
@@ -95,6 +94,17 @@ const ModeratorDashboard = () => {
     setLoading(false);
     void fetchKpis();
   }, [isPublic]);
+
+  // Retry fetching user profile if it fails
+  useEffect(() => {
+    if (meError && !meLoading) {
+      // Retry after a short delay
+      const timer = setTimeout(() => {
+        refetchMe();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [meError, meLoading, refetchMe]);
 
   const fetchKpis = async () => {
     try {
@@ -487,6 +497,48 @@ const ModeratorDashboard = () => {
     navigate("/");
   };
 
+  // Helper function to get payment method label
+  const getPaymentMethodLabel = (method: string | null | undefined): string => {
+    if (!method) return "—";
+    const m = method.toUpperCase();
+    if (m === "CASH") return t("moderator.card.modal.paymentMethod.cash");
+    if (m === "CARD") return t("moderator.card.modal.paymentMethod.card");
+    if (m === "TRANSFER") return t("moderator.card.modal.paymentMethod.transfer");
+    // Fallback for old methods (for backward compatibility with existing data)
+    if (m === "CLICK" || m === "PAYME") return t("moderator.card.modal.paymentMethod.card");
+    if (m === "OTHER") return t("moderator.card.modal.paymentMethod.transfer");
+    return method;
+  };
+
+  // Helper function to get payment status and button variant
+  const getPaymentStatus = (card: any) => {
+    const status = (card?.status || "").toString().toUpperCase();
+    const isPaid = card?.payment_confirmed ?? card?.is_paid ?? false;
+    
+    if (isPaid || status === "PAID" || status === "FULLY_PAID" || status === "FULL_PAID") {
+      return {
+        label: t("client.medicalCards.status.paid"),
+        variant: "default" as const, // Green
+        className: "bg-green-500 hover:bg-green-600 text-white border-green-500"
+      };
+    }
+    
+    if (status === "PARTLY_PAID" || status === "PARTLY") {
+      return {
+        label: t("client.medicalCards.status.partlyPaid"),
+        variant: "secondary" as const, // Yellow
+        className: "bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500"
+      };
+    }
+    
+    // Default: Waiting for Payment
+    return {
+      label: t("client.medicalCards.status.pending"),
+      variant: "destructive" as const, // Red
+      className: "bg-red-500 hover:bg-red-600 text-white border-red-500"
+    };
+  };
+
   const handleBannerImageChange = async (file?: File | null) => {
     if (!file) return;
     setBannerUploading(true);
@@ -504,7 +556,7 @@ const ModeratorDashboard = () => {
     }
   };
 
-  if (loading) {
+  if (loading || meLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background">
         <div className="animate-pulse">
@@ -512,6 +564,14 @@ const ModeratorDashboard = () => {
         </div>
       </div>
     );
+  }
+
+  // If me is still not available after loading, try to refetch silently
+  if (!me && !meLoading && meError) {
+    // Silently retry in background - don't show error to user
+    setTimeout(() => {
+      refetchMe();
+    }, 1000);
   }
 
   return (
@@ -566,7 +626,7 @@ const ModeratorDashboard = () => {
               </div>
               <div>
                 <h2 className="text-3xl font-bold mb-1">
-                  {t("dashboard.welcome")}, {me?.first_name ? `${me.first_name}` : t("moderator.banner.fallbackRole")}! 👤
+                  {t("dashboard.welcome")}, {me?.first_name || me?.last_name ? `${me.first_name || ""} ${me.last_name || ""}`.trim() || t("moderator.banner.fallbackRole") : t("moderator.banner.fallbackRole")}! 👤
                 </h2>
                 <p className="text-primary-foreground/90 text-lg">{t("moderator.banner.subtitle")}</p>
               </div>
@@ -706,7 +766,20 @@ const ModeratorDashboard = () => {
                             <TableCell>{c.client?.full_name ?? c.client_name ?? c.client ?? "—"}</TableCell>
                             <TableCell>{c.pet?.name ?? c.pet_name ?? c.pet ?? "—"}</TableCell>
                             <TableCell>{c.total_amount ?? c.total ?? "—"}</TableCell>
-                            <TableCell>{c.status ?? (c.payment_confirmed ? t("client.medicalCards.status.paid") : t("client.medicalCards.status.pending"))}</TableCell>
+                            <TableCell>
+                              {(() => {
+                                const statusInfo = getPaymentStatus(c);
+                                return (
+                                  <Button
+                                    size="sm"
+                                    className={statusInfo.className}
+                                    onClick={() => setSelectedCard(c)}
+                                  >
+                                    {statusInfo.label}
+                                  </Button>
+                                );
+                              })()}
+                            </TableCell>
                             <TableCell className="text-right">
                               <Button variant="ghost" size="sm" className="gap-2" onClick={() => setSelectedCard(c)}>{t("common.view")}</Button>
                             </TableCell>
@@ -729,6 +802,7 @@ const ModeratorDashboard = () => {
                         <TableHead>ID</TableHead>
                         <TableHead>{t("moderator.card.table.client")}</TableHead>
                         <TableHead>{t("moderator.card.table.pet")}</TableHead>
+                        <TableHead>{t("moderator.card.table.status")}</TableHead>
                         <TableHead>{t("moderator.card.partlyPaid.table.total")}</TableHead>
                         <TableHead>{t("moderator.card.partlyPaid.table.paid")}</TableHead>
                         <TableHead>{t("moderator.card.partlyPaid.table.outstanding")}</TableHead>
@@ -738,13 +812,13 @@ const ModeratorDashboard = () => {
                     <TableBody>
                       {waitingLoading ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground">
+                          <TableCell colSpan={8} className="text-center text-muted-foreground">
                             {t("common.loading")}
                           </TableCell>
                         </TableRow>
                       ) : partlyCards.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground">
+                          <TableCell colSpan={8} className="text-center text-muted-foreground">
                             {t("common.empty")}
                           </TableCell>
                         </TableRow>
@@ -754,9 +828,23 @@ const ModeratorDashboard = () => {
                             <TableCell>{c.id}</TableCell>
                             <TableCell>{c.client?.full_name ?? c.client_name ?? c.client ?? "—"}</TableCell>
                             <TableCell>{c.pet?.name ?? c.pet_name ?? c.pet ?? "—"}</TableCell>
+                            <TableCell>
+                              {(() => {
+                                const statusInfo = getPaymentStatus(c);
+                                return (
+                                  <Button
+                                    size="sm"
+                                    className={statusInfo.className}
+                                    onClick={() => setSelectedCard(c)}
+                                  >
+                                    {statusInfo.label}
+                                  </Button>
+                                );
+                              })()}
+                            </TableCell>
                             <TableCell>{c.total_fee ?? c.total_amount ?? c.total ?? "—"}</TableCell>
                             <TableCell>{c.amount_paid ?? "0"}</TableCell>
-                            <TableCell>{c.outstanding_fee ?? "0"}</TableCell>
+                            <TableCell>{c.outstanding_fee ?? (Number(c.total_fee ?? c.total_amount ?? c.total ?? 0) - Number(c.amount_paid ?? 0)).toFixed(2)}</TableCell>
                             <TableCell className="text-right">
                               <Button
                                 variant="ghost"
@@ -1086,7 +1174,18 @@ const ModeratorDashboard = () => {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">{t("moderator.card.modal.status")}</p>
-                      <p className="font-medium">{selectedCard?.status ?? (selectedCard?.payment_confirmed ? t("client.medicalCards.status.paid") : t("client.medicalCards.status.pending"))}</p>
+                      {(() => {
+                        const statusInfo = getPaymentStatus(selectedCard);
+                        return (
+                          <Button
+                            size="sm"
+                            className={statusInfo.className}
+                            onClick={() => {}}
+                          >
+                            {statusInfo.label}
+                          </Button>
+                        );
+                      })()}
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">{t("moderator.card.modal.total")}</p>
@@ -1261,7 +1360,7 @@ const ModeratorDashboard = () => {
                             {payments.map((p: any, idx: number) => (
                               <TableRow key={p.id ?? idx}>
                                 <TableCell>{p.created_at ? new Date(p.created_at).toLocaleString("ru-RU") : "—"}</TableCell>
-                                <TableCell>{p.method ?? "—"}</TableCell>
+                                <TableCell>{getPaymentMethodLabel(p.method)}</TableCell>
                                 <TableCell>{p.amount ?? "—"}</TableCell>
                                 <TableCell>{p.note ?? "—"}</TableCell>
                                 <TableCell>{p.recorded_by ?? "—"}</TableCell>
@@ -1292,19 +1391,21 @@ const ModeratorDashboard = () => {
 
                     <div className="space-y-2">
                       <Label>{t("moderator.card.modal.paymentMethod")}</Label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        {["CASH", "CLICK", "PAYME", "OTHER"].map((m) => {
+                      <div className="grid grid-cols-3 gap-3">
+                        {["CASH", "CARD", "TRANSFER"].map((m) => {
                           const isActive = paymentMethod === m;
                           const label =
-                            m === "CASH" ? t("moderator.card.modal.paymentMethod.cash") : m === "CLICK" ? t("moderator.card.modal.paymentMethod.click") : m === "PAYME" ? t("moderator.card.modal.paymentMethod.payme") : t("moderator.card.modal.paymentMethod.other");
+                            m === "CASH" 
+                              ? t("moderator.card.modal.paymentMethod.cash") 
+                              : m === "CARD" 
+                              ? t("moderator.card.modal.paymentMethod.card") 
+                              : t("moderator.card.modal.paymentMethod.transfer");
                           const imgSrc =
                             m === "CASH"
                               ? cashImg
-                              : m === "CLICK"
-                              ? clickImg
-                              : m === "PAYME"
-                              ? paymeImg
-                              : otherImg;
+                              : m === "CARD"
+                              ? cardImg
+                              : transferImg;
                           return (
                             <button
                               key={m}
@@ -1317,11 +1418,9 @@ const ModeratorDashboard = () => {
                               <img
                                 src={imgSrc}
                                 alt={label}
-                                className={`${m === "OTHER" ? "h-12 w-12" : "h-13 w-13"} object-contain`}
+                                className="h-13 w-13 object-contain"
                               />
-                              {m === "OTHER" && (
-                                <span className="mt-1 text-xs font-medium">{label}</span>
-                              )}
+                              <span className="mt-1 text-xs font-medium">{label}</span>
                             </button>
                           );
                         })}

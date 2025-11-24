@@ -70,7 +70,32 @@ export const useAuthGuard = () => {
 export const useMe = () => {
   const query = useQuery<MeResponse>({
     queryKey: ["me"],
-    queryFn: async () => Me.get(),
+    queryFn: async () => {
+      try {
+        return await Me.get();
+      } catch (error: any) {
+        // If it's a 401/403, don't retry - user needs to re-authenticate
+        if (error?.response?.status === 401 || error?.response?.status === 403) {
+          throw error;
+        }
+        // For other errors, retry
+        throw error;
+      }
+    },
+    retry: (failureCount, error: any) => {
+      // Don't retry on auth errors
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        return false;
+      }
+      // Retry up to 3 times for other errors
+      return failureCount < 3;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff: 1s, 2s, 4s, max 5s
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (formerly cacheTime)
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchOnMount: true,
   });
 
   useEffect(() => {
@@ -153,7 +178,7 @@ export const useUpdateNurseCareInfo = () => {
 export const useRecordNurseCarePayment = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, amount_paid, method }: { id: number | string; amount_paid: string; method: "CASH" | "CLICK" | "PAYME" | "OTHER" }) =>
+    mutationFn: ({ id, amount_paid, method }: { id: number | string; amount_paid: string; method: "CASH" | "CARD" | "TRANSFER" }) =>
       NurseCareCards.recordPayment(id, { amount_paid, method }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["nurseCareCards"] });

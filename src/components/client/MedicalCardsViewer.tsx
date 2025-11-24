@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { MedicalCards, Doctors } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Pill, ListChecks, ChevronDown, ChevronUp, User as UserIcon, Calendar as CalendarIcon, Image as ImageIcon, Paperclip, Download } from "lucide-react";
+import { FileText, Pill, ListChecks, ChevronDown, ChevronUp, User as UserIcon, Calendar as CalendarIcon, Image as ImageIcon, Paperclip, Download, Home } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
@@ -261,6 +261,25 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                               )}
                             </div>
 
+                            {/* Stationary Room Payment */}
+                            {(() => {
+                              const d: any = detailsByCard[card.id] || {};
+                              const stationaryFee = d.stationary_fee || d.stationary_total || null;
+                              // Only show when stationary_fee exists
+                              if (!stationaryFee || stationaryFee === "0" || stationaryFee === 0) return null;
+                              return (
+                                <div>
+                                  <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                                    <Home className="w-4 h-4 text-primary" /> {t("client.medicalCards.stationaryRoom.title")}
+                                  </div>
+                                  <div className="p-2 rounded-md border bg-background">
+                                    <p className="text-xs text-muted-foreground mb-1">{t("client.medicalCards.stationaryRoom.payment")}</p>
+                                    <p className="font-semibold text-sm">{formatSum(stationaryFee)} {t("client.medicalCards.currency.sum").toUpperCase()}</p>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
                             {/* Attachments: X-rays & PDFs */}
                             {(() => {
                               const attachments = getAttachments(card.id);
@@ -386,8 +405,8 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {card.is_hospitalized && <Badge variant="outline">Стационар</Badge>}
-                        <Badge>{formatSum(detailsByCard[card.id]?.total_fee ?? card.total_amount)} SUM</Badge>
+                        {card.is_hospitalized && <Badge variant="outline">{t("client.medicalCards.stationaryBadge")}</Badge>}
+                        <Badge variant="secondary">{formatSum(detailsByCard[card.id]?.total_fee ?? card.total_amount)} {t("client.medicalCards.currency.sum").toUpperCase()}</Badge>
                       </div>
                     </div>
 
@@ -448,6 +467,25 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                 <div className="text-sm text-muted-foreground">{t("client.medicalCards.prescriptions.empty")}</div>
                               )}
                             </div>
+
+                            {/* Stationary Room Payment */}
+                            {(() => {
+                              const d: any = detailsByCard[card.id] || {};
+                              const stationaryFee = d.stationary_fee || d.stationary_total || null;
+                              // Only show when stationary_fee exists
+                              if (!stationaryFee || stationaryFee === "0" || stationaryFee === 0) return null;
+                              return (
+                                <div>
+                                  <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                                    <Home className="w-4 h-4 text-primary" /> {t("client.medicalCards.stationaryRoom.title")}
+                                  </div>
+                                  <div className="p-2 rounded-md border bg-background">
+                                    <p className="text-xs text-muted-foreground mb-1">{t("client.medicalCards.stationaryRoom.payment")}</p>
+                                    <p className="font-semibold text-sm">{formatSum(stationaryFee)} {t("client.medicalCards.currency.sum").toUpperCase()}</p>
+                                  </div>
+                                </div>
+                              );
+                            })()}
 
                             {/* Attachments: X-rays & PDFs */}
                             {(() => {
@@ -558,8 +596,8 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {card.is_hospitalized && <Badge variant="outline">Стационар</Badge>}
-                        <Badge>{formatSum(detailsByCard[card.id]?.total_fee ?? card.total_amount)} SUM</Badge>
+                        {card.is_hospitalized && <Badge variant="outline">{t("client.medicalCards.stationaryBadge")}</Badge>}
+                        <Badge variant="secondary">{formatSum(detailsByCard[card.id]?.total_fee ?? card.total_amount)} {t("client.medicalCards.currency.sum").toUpperCase()}</Badge>
                       </div>
                     </div>
 
@@ -620,6 +658,25 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                                 <div className="text-sm text-muted-foreground">{t("client.medicalCards.prescriptions.empty")}</div>
                               )}
                             </div>
+
+                            {/* Stationary Room Payment */}
+                            {(() => {
+                              const d: any = detailsByCard[card.id] || {};
+                              const stationaryFee = d.stationary_fee || d.stationary_total || null;
+                              // Only show when stationary_fee exists
+                              if (!stationaryFee || stationaryFee === "0" || stationaryFee === 0) return null;
+                              return (
+                                <div>
+                                  <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                                    <Home className="w-4 h-4 text-primary" /> {t("client.medicalCards.stationaryRoom.title")}
+                                  </div>
+                                  <div className="p-2 rounded-md border bg-background">
+                                    <p className="text-xs text-muted-foreground mb-1">{t("client.medicalCards.stationaryRoom.payment")}</p>
+                                    <p className="font-semibold text-sm">{formatSum(stationaryFee)} {t("client.medicalCards.currency.sum").toUpperCase()}</p>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>

@@ -26,7 +26,13 @@ let queue: Array<(token: string) => void> = [];
 api.interceptors.response.use(
   (res) => res,
   async (error: AxiosError) => {
-    const original = error.config as (AxiosRequestConfig & { _retry?: boolean });
+    const original = error.config as (AxiosRequestConfig & { _retry?: boolean; _suppress404?: boolean });
+
+    // Suppress 404 errors for expected endpoints (nurse profile resolution, task endpoints)
+    if (error.response?.status === 404 && original?._suppress404) {
+      // Return a rejected promise but don't log to console
+      return Promise.reject(error);
+    }
 
     if (error.response?.status === 401 && original && !original._retry) {
       original._retry = true;

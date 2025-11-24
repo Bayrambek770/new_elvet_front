@@ -26,6 +26,7 @@ import { HospitalizationTasks } from "@/components/nurse/HospitalizationTasks";
 import { NurseCareCardsManager } from "@/components/nurse/NurseCareCardsManager";
 import { tokenStore, api } from "@/lib/apiClient";
 import { useMe } from "@/hooks/api";
+import { Tasks } from "@/lib/api";
 import elvetLogo from "@/assets/elvet_logo.jpg";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -143,9 +144,15 @@ const NurseDashboard = () => {
         for (const endpoint of endpoints) {
           if (cancelled || resolved) break;
           try {
-            const { data } = await api.get(endpoint);
+            // Suppress 404 console errors for expected endpoint failures
+            const { data } = await api.get(endpoint, { _suppress404: true } as any);
             if (trySet(data)) break;
-          } catch {
+          } catch (err: any) {
+            // Silently continue to next endpoint for 404s (expected)
+            // Only log unexpected errors (non-404)
+            if (err?.response?.status !== 404) {
+              console.warn(`Unexpected error fetching ${endpoint}:`, err);
+            }
             // continue to next endpoint
           }
         }
@@ -180,14 +187,53 @@ const NurseDashboard = () => {
     setTasksLoading(true);
     setSalaryLoading(true);
     try {
-      const [todoData, doneData, todayData, medicinesData, takenRoomsData, weeklySalaryData, monthlySalaryData] = await Promise.all([
-        api.get(`tasks/to-do/by_id/${nurseId}`).then((r) => r.data).catch(() => null),
-        api.get(`tasks/done/by_id/${nurseId}`).then((r) => r.data).catch(() => null),
-        api.get(`tasks/done/today/by_id/${nurseId}`).then((r) => r.data).catch(() => null),
-        api.get(`medicines/`).then((r) => r.data).catch(() => null),
-        api.get(`stationary-rooms/taken/`).then((r) => r.data).catch(() => null),
-        api.get(`salary/history/${nurseId}/weekly/`).then((r) => r.data).catch(() => null),
-        api.get(`salary/history/${nurseId}/monthly/`).then((r) => r.data).catch(() => null),
+      // Helper to fetch with suppressed 404 errors
+      const fetchSilent = async (url: string) => {
+        try {
+          const response = await api.get(url, { _suppress404: true } as any);
+          return response.data;
+        } catch (err: any) {
+          // Return null for 404s (expected), rethrow other errors
+          if (err?.response?.status === 404) {
+            return null;
+          }
+          throw err;
+        }
+      };
+
+      // Fetch all tasks for this nurse using the Tasks API
+      // Try different parameter names that the API might use
+      const fetchTasksForNurse = async (): Promise<any> => {
+        // First try with nurse_id parameter (most common)
+        try {
+          const data = await Tasks.list<any>({ nurse_id: nurseId });
+          return data;
+        } catch {
+          // Then try with nurse parameter
+          try {
+            const data = await Tasks.list<any>({ nurse: nurseId });
+            return data;
+          } catch {
+            // Finally, fetch all tasks and filter client-side
+            const data = await Tasks.list<any>();
+            const allTasks = Array.isArray(data) ? data : (data as any)?.results || [];
+            // Filter by nurse_id client-side
+            return allTasks.filter((task: any) => {
+              const taskNurseId = task.nurse_id || task.nurse?.id || task.nurse;
+              return taskNurseId === nurseId || String(taskNurseId) === String(nurseId);
+            });
+          }
+        }
+      };
+      
+      const allTasksPromise = fetchTasksForNurse().catch(() => null);
+      
+      const [allTasksData, medicinesData, takenRoomsData, weeklySalaryData, monthlySalaryData] = await Promise.all([
+        allTasksPromise,
+        fetchSilent(`medicines/`),
+        fetchSilent(`stationary-rooms/taken/`),
+        fetchSilent(`salary/history/${nurseId}/weekly/`),
+        fetchSilent(`salary/history/${nurseId}/monthly/`),
       ]);
 
       const toArray = (payload: any) => {
@@ -213,14 +259,38 @@ const NurseDashboard = () => {
         return toArray(payload).length;
       };
 
-      setTodoTasks(toArray(todoData));
-      setDoneTasks(toArray(doneData));
-      setDoneTodayTasks(toArray(todayData));
+      // Process tasks: filter by status and date
+      const allTasks = toArray(allTasksData);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Filter tasks by status
+      const todoTasksFiltered = allTasks.filter((task: any) => {
+        const status = (task.status || "").toString().toUpperCase();
+        return status !== "DONE" && status !== "COMPLETED";
+      });
+      
+      const doneTasksFiltered = allTasks.filter((task: any) => {
+        const status = (task.status || "").toString().toUpperCase();
+        return status === "DONE" || status === "COMPLETED";
+      });
+      
+      // Filter done tasks by today's date
+      const doneTodayTasksFiltered = doneTasksFiltered.filter((task: any) => {
+        if (!task.completed_at && !task.updated_at) return false;
+        const taskDate = new Date(task.completed_at || task.updated_at);
+        taskDate.setHours(0, 0, 0, 0);
+        return taskDate.getTime() === today.getTime();
+      });
+
+      setTodoTasks(todoTasksFiltered);
+      setDoneTasks(doneTasksFiltered);
+      setDoneTodayTasks(doneTodayTasksFiltered);
 
       setMetrics({
-        todo: toCount(todoData),
-        done: toCount(doneData),
-        doneToday: toCount(todayData),
+        todo: todoTasksFiltered.length,
+        done: doneTasksFiltered.length,
+        doneToday: doneTodayTasksFiltered.length,
         medicines: toCount(medicinesData),
         pets: toCount(takenRoomsData),
       });

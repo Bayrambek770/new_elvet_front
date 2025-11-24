@@ -28,7 +28,6 @@ export const FeedInventory = () => {
                 <TableHead>Производитель</TableHead>
                 <TableHead>Животное</TableHead>
                 <TableHead>Возраст</TableHead>
-                <TableHead>Вес упаковки, кг</TableHead>
                 <TableHead>Цена за кг</TableHead>
                 <TableHead>Доступно, кг</TableHead>
                 <TableHead>Описание</TableHead>
@@ -45,7 +44,6 @@ export const FeedInventory = () => {
                     <Badge variant="outline">{f.animal_type === "DOG" ? "Собака" : "Кошка"}</Badge>
                   </TableCell>
                   <TableCell>{f.age_group}</TableCell>
-                  <TableCell>{f.package_weight_kg}</TableCell>
                   <TableCell>{f.price_per_kg}</TableCell>
                   <TableCell>{f.available_weight_kg}</TableCell>
                   <TableCell className="max-w-[240px] truncate" title={f.description || ""}>{f.description || "-"}</TableCell>
