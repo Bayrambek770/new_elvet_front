@@ -275,6 +275,26 @@ const DoctorDashboard = () => {
   const [editHourlyStart, setEditHourlyStart] = useState("");
   const [editHourlyEnd, setEditHourlyEnd] = useState("");
   const [editFreeRoomsDialogOpen, setEditFreeRoomsDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (bookingType === "DAILY") {
+      setHourlyStartDateTime("");
+      setHourlyEndDateTime("");
+    } else {
+      setStationaryStartDate("");
+      setStationaryReleaseDate("");
+    }
+  }, [bookingType]);
+
+  useEffect(() => {
+    if (editBookingType === "DAILY") {
+      setEditHourlyStart("");
+      setEditHourlyEnd("");
+    } else {
+      setEditStayStart("");
+      setEditStayEnd("");
+    }
+  }, [editBookingType]);
   // Edit usages state
   type EditServiceUsageRow = { _localId: string; _new?: boolean; _deleted?: boolean; _dirty?: boolean } & Partial<ApiServiceUsage> & { service_name_fallback?: string };
   type EditMedicineUsageRow = { _localId: string; _new?: boolean; _deleted?: boolean; _dirty?: boolean } & Partial<ApiMedicineUsage>;
@@ -912,6 +932,12 @@ const DoctorDashboard = () => {
     return record?.medicine_name || record?.name || t('doctor.edit.medicines.fallback', { id });
   };
 
+  const toDateIso = (value?: string | null, endOfDay = false) => {
+    if (!value) return null;
+    const suffix = endOfDay ? 'T23:59:59' : 'T00:00:00';
+    return new Date(`${value}${suffix}`).toISOString();
+  };
+
   const handleSaveMedicalCard = async () => {
     if (!selectedClient) { toast({ title: t('doctor.create.validation.selectClient'), variant: "destructive" }); return; }
     if (!selectedPetId) { toast({ title: t('doctor.create.validation.selectPet'), variant: "destructive" }); return; }
@@ -919,7 +945,7 @@ const DoctorDashboard = () => {
     // Required numeric vitals
     const weightNum = Number(weight);
     const tempNum = Number(temperature);
-    const bpNum = Number(bloodPressure);
+    const bpStr = bloodPressure.trim();
     const hrNum = Number(heartRate);
     const rrNum = Number(respiratoryRate);
     const mmStr = mucousMembrane.trim();
@@ -928,7 +954,7 @@ const DoctorDashboard = () => {
     const missing: string[] = [];
     if (!isFinite(weightNum)) missing.push(t('doctor.vitals.weight'));
     if (!isFinite(tempNum)) missing.push(t('doctor.vitals.temperature'));
-    if (!isFinite(bpNum)) missing.push(t('doctor.vitals.bloodPressure'));
+    if (!bpStr) missing.push(t('doctor.vitals.bloodPressure'));
     if (!isFinite(hrNum)) missing.push(t('doctor.vitals.heartRate'));
     if (!isFinite(rrNum)) missing.push(t('doctor.vitals.respiratoryRate'));
     if (!mmStr) missing.push(t('doctor.vitals.mucous'));
@@ -959,7 +985,7 @@ const DoctorDashboard = () => {
       chest_condition: chestStr,
       notes: notesStr,
       weight: weightNum,
-      blood_pressure: bpNum,
+      blood_pressure: bpStr || null,
       mucous_membrane: mmStr,
       heart_rate: hrNum,
       respiratory_rate: rrNum,
@@ -1990,7 +2016,7 @@ const DoctorDashboard = () => {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="bloodp">{t('doctor.vitals.bloodPressure')}</Label>
-                        <Input id="bloodp" type="number" required value={bloodPressure} onChange={(e) => setBloodPressure(e.target.value)} placeholder={t('doctor.vitals.bloodPressurePlaceholder')} className={`${!String(bloodPressure||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
+                        <Input id="bloodp" type="text" required value={bloodPressure} onChange={(e) => setBloodPressure(e.target.value)} placeholder={t('doctor.vitals.bloodPressurePlaceholder')} className={`${!String(bloodPressure||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
                         {!String(bloodPressure||'').trim() && <p className="text-xs text-destructive">Required</p>}
                       </div>
                       <div className="space-y-2">
@@ -2279,14 +2305,14 @@ const DoctorDashboard = () => {
                             {stationaryRoom && (
                               <div className="space-y-3">
                                 <div className="space-y-2">
-                                  <Label>{t('doctor.stationary.bookingType')}</Label>
+                                  <Label>{t('doctor.stationary.bookingType', { defaultValue: 'Тип бронирования' })}</Label>
                                   <Select value={bookingType} onValueChange={(val: "DAILY" | "HOURLY") => setBookingType(val)}>
                                     <SelectTrigger>
-                                      <SelectValue placeholder={t('doctor.stationary.bookingTypePlaceholder')} />
+                                      <SelectValue placeholder={t('doctor.stationary.bookingTypePlaceholder', { defaultValue: 'Выберите тип' })} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="DAILY">{t('doctor.stationary.typeDaily')}</SelectItem>
-                                      <SelectItem value="HOURLY">{t('doctor.stationary.typeHourly')}</SelectItem>
+                                      <SelectItem value="DAILY">{t('doctor.stationary.typeDaily', { defaultValue: 'Daily' })}</SelectItem>
+                                      <SelectItem value="HOURLY">{t('doctor.stationary.typeHourly', { defaultValue: 'Hourly' })}</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -2707,14 +2733,14 @@ const DoctorDashboard = () => {
                           {editStationaryRoom && (
                             <div className="space-y-3">
                               <div className="space-y-2">
-                                <Label>{t('doctor.stationary.bookingType')}</Label>
+                                <Label>{t('doctor.stationary.bookingType', { defaultValue: 'Тип бронирования' })}</Label>
                                 <Select value={editBookingType} onValueChange={(val: "DAILY" | "HOURLY") => setEditBookingType(val)}>
                                   <SelectTrigger>
-                                    <SelectValue placeholder={t('doctor.stationary.bookingTypePlaceholder')} />
+                                    <SelectValue placeholder={t('doctor.stationary.bookingTypePlaceholder', { defaultValue: 'Выберите тип' })} />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="DAILY">{t('doctor.stationary.typeDaily')}</SelectItem>
-                                    <SelectItem value="HOURLY">{t('doctor.stationary.typeHourly')}</SelectItem>
+                                    <SelectItem value="DAILY">{t('doctor.stationary.typeDaily', { defaultValue: 'Daily' })}</SelectItem>
+                                    <SelectItem value="HOURLY">{t('doctor.stationary.typeHourly', { defaultValue: 'Hourly' })}</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
