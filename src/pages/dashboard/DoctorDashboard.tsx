@@ -1269,7 +1269,8 @@ const DoctorDashboard = () => {
   const fetchAllPaginated = async <T,>(endpoint: string): Promise<Paginated<T>> => {
     const empty: Paginated<T> = { count: 0, next: null, previous: null, results: [] };
     try {
-      let url: string | null = endpoint.includes("?") ? endpoint : `${endpoint}?`;
+      // Always start with an explicit page to avoid servers rejecting a dangling '?'
+      let url: string | null = endpoint.includes("?") ? endpoint : `${endpoint}?page=1`;
       let results: T[] = [];
       let guard = 0;
 
