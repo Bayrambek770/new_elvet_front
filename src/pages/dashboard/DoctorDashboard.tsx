@@ -1265,25 +1265,38 @@ const DoctorDashboard = () => {
     }
   };
 
-  // Fetch the entire catalog (all pages) to show full lists in the create-card modal
+  // Fetch the entire catalog (all pages) to show full lists in the create-card modal.
+  // Uses explicit page & page_size to avoid relying solely on "next" links and prevents partial lists.
   const fetchAllPaginated = async <T,>(endpoint: string): Promise<Paginated<T>> => {
     const empty: Paginated<T> = { count: 0, next: null, previous: null, results: [] };
     try {
-      // Always start with an explicit page to avoid servers rejecting a dangling '?'
-      let url: string | null = endpoint.includes("?") ? endpoint : `${endpoint}?page=1`;
+      let page = 1;
+      const pageSize = 100;
       let results: T[] = [];
       let guard = 0;
+      let hasMore = true;
+      let totalCount: number | null = null;
 
-      while (url && guard < 20) {
+      while (hasMore && guard < 50) {
+        const separator = endpoint.includes("?") ? "&" : "?";
+        const url = `${endpoint}${separator}page=${page}&page_size=${pageSize}`;
         const { data } = await api.get(url);
+
         if (Array.isArray(data)) {
-          results = data;
-          break;
+          // Backend returned a plain array (non-paginated)
+          return { count: data.length, next: null, previous: null, results: data };
         }
+
         const pageResults: T[] = Array.isArray(data?.results) ? data.results : [];
+        if (typeof data?.count === "number") totalCount = data.count;
+
         results = results.concat(pageResults);
-        url = data?.next ?? null;
+        page += 1;
         guard += 1;
+
+        const reachedCount = totalCount != null && results.length >= totalCount;
+        const hasNext = Boolean(data?.next);
+        hasMore = hasNext || (!reachedCount && pageResults.length > 0);
       }
 
       return { count: results.length, next: null, previous: null, results };
