@@ -857,13 +857,13 @@ const DoctorDashboard = () => {
       setFormMedicinesLoading(true);
       setFormFeedsLoading(true);
       Promise.all([
-        api.get('services/?page=1').then(r => r.data).catch(() => null),
-        api.get('medicines/?page=1').then(r => r.data).catch(() => null),
-        api.get('pet-feeds/?page=1').then(r => r.data).catch(() => null),
+        fetchAllPaginated<ApiService>('services/'),
+        fetchAllPaginated<ApiMedicine>('medicines/'),
+        fetchAllPaginated<ApiFeed>('pet-feeds/'),
       ]).then(([s, m, f]) => {
-        setFormServices(s && Array.isArray(s.results) ? s : { count: 0, next: null, previous: null, results: [] });
-        setFormMedicines(m && Array.isArray(m.results) ? m : { count: 0, next: null, previous: null, results: [] });
-        setFormFeeds(f && Array.isArray(f.results) ? f : { count: 0, next: null, previous: null, results: [] });
+        setFormServices(s);
+        setFormMedicines(m);
+        setFormFeeds(f);
       }).finally(() => { setFormServicesLoading(false); setFormMedicinesLoading(false); setFormFeedsLoading(false); });
     } else {
       // reset selections when closing
@@ -1262,6 +1262,32 @@ const DoctorDashboard = () => {
       toast({ title: t('doctor.fetch.errorTitle'), description: t('doctor.fetch.errorDescription', { resource: url }), variant: 'destructive' });
     } finally {
       setLoad(false);
+    }
+  };
+
+  // Fetch the entire catalog (all pages) to show full lists in the create-card modal
+  const fetchAllPaginated = async <T,>(endpoint: string): Promise<Paginated<T>> => {
+    const empty: Paginated<T> = { count: 0, next: null, previous: null, results: [] };
+    try {
+      let url: string | null = endpoint.includes("?") ? endpoint : `${endpoint}?`;
+      let results: T[] = [];
+      let guard = 0;
+
+      while (url && guard < 20) {
+        const { data } = await api.get(url);
+        if (Array.isArray(data)) {
+          results = data;
+          break;
+        }
+        const pageResults: T[] = Array.isArray(data?.results) ? data.results : [];
+        results = results.concat(pageResults);
+        url = data?.next ?? null;
+        guard += 1;
+      }
+
+      return { count: results.length, next: null, previous: null, results };
+    } catch {
+      return empty;
     }
   };
 

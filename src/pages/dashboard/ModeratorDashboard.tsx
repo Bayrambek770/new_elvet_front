@@ -1420,7 +1420,7 @@ const ModeratorDashboard = () => {
                                 alt={label}
                                 className="h-13 w-13 object-contain"
                               />
-                              <span className="mt-1 text-xs font-medium">{label}</span>
+                                <span className="mt-1 text-xs font-medium">{label}</span>
                             </button>
                           );
                         })}
