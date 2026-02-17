@@ -166,12 +166,24 @@ export const uz = {
   "doctor.newCard.title": "Yangi tibbiy karta",
   "doctor.newCard.subtitle": "Uy hayvoni ma'lumotlari, diagnoz, tahlillar, xizmatlar va dori-darmonlarni to'ldiring",
   "doctor.sections.petAndExam": "Uy hayvoni va ko'rik",
-  // Tabs (Doctor)
+  // Tabs (Doctor) - orqaga muvofiqlik uchun
   "doctor.tabs.clients": "Mijozlar",
   "doctor.tabs.services": "Xizmatlar",
   "doctor.tabs.medicines": "Dori-darmonlar",
   "doctor.tabs.history": "Tarix",
   "doctor.tabs.rooms": "Palatalar",
+  // Shifokor yon paneli navigatsiyasi
+  "doctor.sidebar.navigation": "Navigatsiya",
+  "doctor.sidebar.main": "Asosiy",
+  "doctor.sidebar.clients": "Mijozlar",
+  "doctor.sidebar.services": "Xizmatlar",
+  "doctor.sidebar.medicines": "Dori-darmonlar",
+  "doctor.sidebar.history": "Tarix",
+  "doctor.sidebar.rooms": "Palatalar",
+  "doctor.sidebar.salary": "Maosh tarixi",
+  "doctor.sidebar.collapse": "Yon panelni yig'ish",
+  "doctor.sidebar.expand": "Yon panelni yoyish",
+  "doctor.sidebar.hint": "Bo'limlar orasida navigatsiya qilish uchun yon paneldan foydalaning",
   "doctor.pet.selectLabel": "Mijozning hayvoni",
   "doctor.pet.selectPlaceholder": "Hayvonni tanlang",
   "doctor.pet.loading": "Hayvonlar yuklanmoqda…",
@@ -283,6 +295,7 @@ export const uz = {
   // Doctor card creation flow
   "doctor.create.validation.selectClient": "Mijozni tanlang",
   "doctor.create.validation.selectPet": "Hayvonni tanlang",
+  "doctor.create.validation.selectNurse": "Mas'ul hamshirani tanlang",
   "doctor.create.validation.diagnosis": "Diagnozni kiriting",
   "doctor.create.validation.requiredFieldsTitle": "Majburiy maydonlar to'ldirilmagan",
   "doctor.create.validation.selectItems": "Kamida bitta xizmat, dori yoki oziq qo'shing",
@@ -295,6 +308,10 @@ export const uz = {
   "doctor.create.idMissingDescription": "Server karta identifikatorini qaytarmadi",
   "doctor.create.successTitle": "Tibbiy karta yaratildi",
   "doctor.create.successDescription": "Karta №{{id}} muvaffaqiyatli saqlandi",
+  "doctor.create.nursesLoadError": "Hamshiralarni yuklab bo'lmadi",
+  "doctor.create.assignedNurseLabel": "Mas'ul hamshira",
+  "doctor.create.assignedNursePlaceholder": "Hamshirani tanlang",
+  "doctor.create.noNurses": "Hamshiralar mavjud emas",
   "doctor.create.pet.noClient": "Hayvon yaratishdan oldin mijozni tanlang",
   "doctor.create.pet.nameRequired": "Hayvon nomini kiriting",
   "doctor.create.pet.speciesRequired": "Hayvon turini tanlang",
@@ -618,7 +635,9 @@ export const uz = {
   "client.profile.phonePrimary": "Asosiy telefon",
   "client.profile.phoneSecondary": "Qo‘shimcha telefon",
   "client.profile.phoneInvalid": "Telefon formati noto‘g‘ri",
-  "client.profile.phonesMustDiffer": "Telefon raqamlari turlicha bo‘lishi kerak",
+  "client.profile.phonesMustDiffer": "Telefon raqamlari har xil bo'lishi kerak",
+  "client.profile.error.duplicatePhone": "Takroriy telefon raqami",
+  "client.profile.error.phoneAlreadyInUse": "Bu telefon raqami ({{phone}}) boshqa hisob tomonidan ishlatilmoqda",
   "client.profile.edit": "Profilni tahrirlash",
   "client.profile.toast.updateSuccess": "Profil yangilandi",
   "client.profile.toast.photoUpdateSuccess": "Foto yangilandi",
@@ -667,6 +686,11 @@ export const uz = {
   "client.medicalCards.doctor.loading": "Doktor: yuklanmoqda...",
   "client.medicalCards.doctor.unknown": "Doktor: noma'lum",
   "client.medicalCards.doctor.prefix": "Dr.",
+  "client.medicalCards.assignedNurse": "Mas'ul hamshira",
+  "client.medicalCards.assignedNurse.unknown": "Tayinlanmagan",
+  
+  // Nurse medical card view
+  "nurse.medicalCards.assignedNurse": "Mas'ul hamshira",
   
   // Client dashboard banner/nav helpers
   "client.hero.fallbackRole": "Mijoz",
@@ -685,6 +709,19 @@ export const uz = {
   "nurse.profileNotFound.title": "Hamshira profili topilmadi",
   "nurse.profileNotFound.description": "Administrator bilan bog'laning",
   "nurse.profileNotFound.inlineWarning": "Hamshira profilingiz aniqlanmadi. Vazifalar bilan ishlashni davom ettirish uchun administratorga murojaat qiling.",
+
+  // Nurse sidebar navigation
+  "nurse.sidebar.navigation": "Navigatsiya",
+  "nurse.sidebar.main": "Asosiy",
+  "nurse.sidebar.procedures": "Protseduralar",
+  "nurse.sidebar.medicalCards": "Tibbiy kartalar",
+  "nurse.sidebar.nurseCare": "Hamshira parvarishi",
+  "nurse.sidebar.medicines": "Dori-darmonlar",
+  "nurse.sidebar.schedule": "Jadval",
+  "nurse.sidebar.salary": "Maosh tarixi",
+  "nurse.sidebar.collapse": "Yon panelni yig'ish",
+  "nurse.sidebar.expand": "Yon panelni ochish",
+  "nurse.sidebar.hint": "Bo'limlar o'rtasida navigatsiya qilish uchun yon paneldan foydalaning",
 
   // Nurse metrics boxes
   "nurse.metrics.title": "Ish ko'rsatkichlari",
@@ -706,9 +743,14 @@ export const uz = {
 
   // Nurse medicines tab
   "nurse.medicines.title": "Dori-darmon ombori",
-  "nurse.medicines.description": "API orqali qoldiq va mavjudlik nazorati",
+  "nurse.medicines.description": "Ma'lumotlar bazasidagi barcha dori-darmonlar joriy qoldiqlari bilan",
   "nurse.medicines.loading": "Ombor ma'lumotlari yangilanmoqda...",
   "nurse.medicines.empty": "Dori-darmonlar ro'yxati bo'sh",
+  "nurse.medicines.total": "Jami: {{count}}",
+  "nurse.medicines.searchPlaceholder": "Dori-darmonlarni nomi yoki kategoriyasi bo'yicha qidirish...",
+  "nurse.medicines.noSearchResults": "Qidiruv bo'yicha dori-darmonlar topilmadi",
+  "nurse.medicines.clearSearch": "Qidiruvni tozalash",
+  "nurse.medicines.searchResults": "{{total}} ta dori-darmondan {{count}} tasi ko'rsatilmoqda",
   "nurse.medicines.table.name": "Nomi",
   "nurse.medicines.table.category": "Kategoriya",
   "nurse.medicines.table.stock": "Qoldiq",
@@ -912,8 +954,10 @@ export const uz = {
   "moderator.select.pet": "Hayvonni tanlang",
 
   // Client dashboard - Nurse Care tab
-  "client.tabs.nurseCare": "Nurse Care",
-  "client.tabs.nurseCareShort": "Nurse",
+  "client.tabs.nurseCare": "Hamshira kartalari",
+  "client.tabs.nurseCareShort": "Kartalar",
+  "client.tabs.historyCards": "Tarix kartalari",
+  "client.tabs.historyCardsShort": "Tarix",
 
   // Nurse dashboard - Nurse Care tab
   "nurse.tabs.nurseCare": "Nurse Care 💗",
@@ -953,7 +997,7 @@ export const uz = {
   "client.medicalCards.attachments.openFile": "Ochish",
 
   // Client NurseCareCardsViewer
-  "client.nurseCare.title": "Hamshira parvarish kartalari",
+  "client.nurseCare.title": "Hamshira kartalari",
   "client.nurseCare.subtitle": "Hamshira parvarish tarixini ko'rish",
   "client.nurseCare.loading": "Yuklanmoqda…",
   "client.nurseCare.error": "Yuklab bo'lmadi",
@@ -970,6 +1014,23 @@ export const uz = {
   "client.nurseCare.total": "Jami:",
   "client.nurseCare.paid": "To'langan:",
   "client.nurseCare.remain": "Qoldiq:",
+
+  // Client HistoryCardsViewer (unified medical + nurse cards)
+  "client.historyCards.title": "Tarix kartalari",
+  "client.historyCards.subtitle": "Barcha tibbiy va parvarish kartalari bir joyda",
+  "client.historyCards.filterByStatus": "To'lov holatiga ko'ra filtrlash",
+  "client.historyCards.status.waiting": "To'lovni kutmoqda",
+  "client.historyCards.status.waitingShort": "Kutish",
+  "client.historyCards.status.partlyPaid": "Qisman to'langan",
+  "client.historyCards.status.partlyPaidShort": "Qisman",
+  "client.historyCards.status.fullyPaid": "To'liq to'langan",
+  "client.historyCards.status.fullyPaidShort": "To'liq",
+  "client.historyCards.badge.medical": "Tibbiy",
+  "client.historyCards.badge.medicalShort": "Tib",
+  "client.historyCards.badge.nurseCare": "Parvarish",
+  "client.historyCards.badge.nurseCareShort": "Parv",
+  "client.historyCards.empty": "Kartalar topilmadi",
+  "client.historyCards.emptyHint": "Boshqa to'lov holatini tanlang",
 
   // Moderator NurseCareCardsManager
   "moderator.nurseCare.title": "Hamshira parvarish kartalari",

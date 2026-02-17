@@ -38,9 +38,21 @@ All colors MUST be HSL.
 
     --radius: 0.75rem;
 
-    --hero-gradient: linear-gradient(135deg, hsl(169, 84%, 35%), hsl(169, 84%, 45%));
-    --card-gradient: linear-gradient(180deg, hsl(0, 0%, 100%), hsl(210, 40%, 98%));
-    --accent-gradient: linear-gradient(135deg, hsl(27, 96%, 61%), hsl(27, 96%, 71%));
+    --hero-gradient: linear-gradient(
+      135deg,
+      hsl(169, 84%, 35%),
+      hsl(169, 84%, 45%)
+    );
+    --card-gradient: linear-gradient(
+      180deg,
+      hsl(0, 0%, 100%),
+      hsl(210, 40%, 98%)
+    );
+    --accent-gradient: linear-gradient(
+      135deg,
+      hsl(27, 96%, 61%),
+      hsl(27, 96%, 71%)
+    );
 
     --shadow-sm: 0 1px 2px hsl(210 20% 15% / 0.05);
     --shadow-md: 0 4px 6px hsl(210 20% 15% / 0.1);
@@ -88,9 +100,21 @@ All colors MUST be HSL.
     --input: 210 30% 20%;
     --ring: 169 84% 45%;
 
-    --hero-gradient: linear-gradient(135deg, hsl(169, 84%, 35%), hsl(169, 84%, 50%));
-    --card-gradient: linear-gradient(180deg, hsl(210, 30%, 10%), hsl(210, 30%, 12%));
-    --accent-gradient: linear-gradient(135deg, hsl(27, 96%, 61%), hsl(27, 96%, 71%));
+    --hero-gradient: linear-gradient(
+      135deg,
+      hsl(169, 84%, 35%),
+      hsl(169, 84%, 50%)
+    );
+    --card-gradient: linear-gradient(
+      180deg,
+      hsl(210, 30%, 10%),
+      hsl(210, 30%, 12%)
+    );
+    --accent-gradient: linear-gradient(
+      135deg,
+      hsl(27, 96%, 61%),
+      hsl(27, 96%, 71%)
+    );
 
     --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.1);
     --shadow-md: 0 4px 6px hsl(0 0% 0% / 0.2);
@@ -120,13 +144,36 @@ All colors MUST be HSL.
 
 /* Subtle shake animation for invalid submit */
 @keyframes shake-no {
-  0% { transform: translateX(0); }
-  20% { transform: translateX(-4px); }
-  40% { transform: translateX(4px); }
-  60% { transform: translateX(-3px); }
-  80% { transform: translateX(3px); }
-  100% { transform: translateX(0); }
+  0% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+  100% {
+    transform: translateX(0);
+  }
 }
 .shake-no {
   animation: shake-no 0.35s ease-in-out;
+}
+
+/* Hide scrollbar for horizontal tabs on mobile */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+  }
 }

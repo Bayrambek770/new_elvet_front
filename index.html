@@ -3,25 +3,47 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Prevent FOUC - minimal critical CSS loaded synchronously */
+      #root {
+        opacity: 0;
+      }
+      #root.loaded {
+        opacity: 1;
+        transition: opacity 0.15s ease-in;
+      }
+    </style>
     <title>VetClinic - ELVET</title>
-    <meta name="description" content="Профессиональная ветеринарная помощь для ваших питомцев. Современное оборудование, опытные врачи, работаем 24/7" />
-  <!-- Open Graph -->
-  <meta property="og:title" content="Elvet Clinic - Ветеринарная клиника" />
-  <meta property="og:description" content="Профессиональная ветеринарная помощь 24/7. Опытные врачи, современное оборудование, забота о здоровье ваших питомцев." />
-  <meta property="og:type" content="website" />
-  <meta property="og:image" content="/elvet_logo.jpg" />
-  <meta property="og:locale" content="ru_RU" />
-  <meta property="og:site_name" content="Elvet Clinic" />
+    <meta
+      name="description"
+      content="Профессиональная ветеринарная помощь для ваших питомцев. Современное оборудование, опытные врачи, работаем 24/7"
+    />
+    <!-- Open Graph -->
+    <meta property="og:title" content="Elvet Clinic - Ветеринарная клиника" />
+    <meta
+      property="og:description"
+      content="Профессиональная ветеринарная помощь 24/7. Опытные врачи, современное оборудование, забота о здоровье ваших питомцев."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/elvet_logo.jpg" />
+    <meta property="og:locale" content="ru_RU" />
+    <meta property="og:site_name" content="Elvet Clinic" />
 
-  <!-- Twitter Cards -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:site" content="@elvet_clinic" />
-  <meta name="twitter:title" content="Elvet Clinic" />
-  <meta name="twitter:description" content="Профессиональная ветеринарная помощь 24/7 для ваших питомцев." />
-  <meta name="twitter:image" content="/elvet_logo.jpg" />
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@elvet_clinic" />
+    <meta name="twitter:title" content="Elvet Clinic" />
+    <meta
+      name="twitter:description"
+      content="Профессиональная ветеринарная помощь 24/7 для ваших питомцев."
+    />
+    <meta name="twitter:image" content="/elvet_logo.jpg" />
   </head>
 
   <body>

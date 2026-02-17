@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { MedicalCards, Doctors } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Pill, ListChecks, ChevronDown, ChevronUp, User as UserIcon, Calendar as CalendarIcon, Image as ImageIcon, Paperclip, Download, Home } from "lucide-react";
+import { FileText, Pill, ListChecks, ChevronDown, ChevronUp, User as UserIcon, Calendar as CalendarIcon, Image as ImageIcon, Paperclip, Download, Home, Stethoscope } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
@@ -123,6 +123,19 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
   return name ? `${t("client.medicalCards.doctor.prefix")} ${name}` : t("client.medicalCards.doctor.unknown");
   };
 
+  const getAssignedNurseLabel = (card: any) => {
+    const d = detailsByCard[card.id] || card;
+    const nurse = d?.assigned_nurse;
+    if (!nurse) return t("client.medicalCards.assignedNurse.unknown");
+    if (typeof nurse === "object") {
+      const fn = nurse.first_name || "";
+      const ln = nurse.last_name || "";
+      const fullName = nurse.full_name || `${fn} ${ln}`.trim();
+      return fullName || t("client.medicalCards.assignedNurse.unknown");
+    }
+    return `Nurse #${nurse}`;
+  };
+
   const getAttachments = (cardId: number) => {
     const d = detailsByCard[cardId] || {};
     const fromDetail = Array.isArray(d.attachments) ? d.attachments : [];
@@ -192,9 +205,10 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-semibold">{card.animal?.name || t("client.medicalCards.petFallback")} — {t("client.medicalCards.title")} #{card.card_number}</div>
-                        <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="mt-1 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                           <span className="inline-flex items-center gap-1"><CalendarIcon className="w-4 h-4" />{getDisplayDate(card)}</span>
                           <span className="inline-flex items-center gap-1"><UserIcon className="w-4 h-4" />{getDoctorLabel(card)}</span>
+                          <span className="inline-flex items-center gap-1"><Stethoscope className="w-4 h-4" />{getAssignedNurseLabel(card)}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -399,9 +413,10 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-semibold">{card.animal?.name || t("client.medicalCards.petFallback")} — {t("client.medicalCards.title")} #{card.card_number}</div>
-                        <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="mt-1 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                           <span className="inline-flex items-center gap-1"><CalendarIcon className="w-4 h-4" />{getDisplayDate(card)}</span>
                           <span className="inline-flex items-center gap-1"><UserIcon className="w-4 h-4" />{getDoctorLabel(card)}</span>
+                          <span className="inline-flex items-center gap-1"><Stethoscope className="w-4 h-4" />{getAssignedNurseLabel(card)}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -590,9 +605,10 @@ export const MedicalCardsViewer = ({ userId }: { userId: string | number }) => {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-semibold">{card.animal?.name || t("client.medicalCards.petFallback")} — {t("client.medicalCards.title")} #{card.card_number}</div>
-                        <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="mt-1 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                             <span className="inline-flex items-center gap-1"><CalendarIcon className="w-4 h-4" />{getDisplayDate(card)}</span>
                             <span className="inline-flex items-center gap-1"><UserIcon className="w-4 h-4" />{getDoctorLabel(card)}</span>
+                            <span className="inline-flex items-center gap-1"><Stethoscope className="w-4 h-4" />{getAssignedNurseLabel(card)}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

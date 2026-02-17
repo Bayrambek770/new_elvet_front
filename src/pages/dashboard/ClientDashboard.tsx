@@ -9,8 +9,7 @@ import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { PetsManager } from "@/components/client/PetsManager";
 import { AppointmentsManager } from "@/components/client/AppointmentsManager";
-import { MedicalCardsViewer } from "@/components/client/MedicalCardsViewer";
-import { NurseCareCardsViewer } from "@/components/client/NurseCareCardsViewer";
+import { HistoryCardsViewer } from "@/components/client/HistoryCardsViewer"; // Changed from MedicalCardsViewer and NurseCareCardsViewer
 import { ProfileEditor } from "@/components/client/ProfileEditor";
 import { useMe } from "@/hooks/api";
 import { tokenStore } from "@/lib/apiClient";
@@ -23,7 +22,6 @@ const ClientDashboard = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
   const { data: me, isLoading: loading } = useMe();
-console.log(me);
 
   useEffect(() => {
     if (!isPublic && !loading && !me) {
@@ -117,38 +115,28 @@ console.log(me);
 
         {/* Enhanced Tabs */}
         <Tabs defaultValue="pets" className="space-y-5">
-          <TabsList className="bg-card/80 shadow-md border p-1.5 h-auto rounded-2xl backdrop-blur-sm flex flex-wrap gap-2 overflow-x-auto">
+          <TabsList className="bg-card/80 shadow-md border p-2 h-auto rounded-2xl backdrop-blur-sm inline-flex w-full overflow-x-auto gap-2 justify-start scrollbar-hide">
             <TabsTrigger 
               value="pets" 
-              className="flex items-center gap-2 rounded-xl py-3 px-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-emerald-500/40 data-[state=inactive]:hover:bg-muted/60 transition-all flex-shrink-0"
+              className="flex items-center gap-2 rounded-xl py-2.5 px-4 text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-emerald-500/40 data-[state=inactive]:hover:bg-muted/60 transition-all whitespace-nowrap"
             >
-              <PawPrint className="w-5 h-5" />
-              <span className="hidden sm:inline">{t("dashboard.myPets")}</span>
-              <span className="sm:hidden">{t("dashboard.myPets")}</span>
+              <PawPrint className="w-4 h-4" />
+              <span>{t("dashboard.myPets")}</span>
             </TabsTrigger>
             <TabsTrigger 
-              value="cards" 
-              className="flex items-center gap-2 rounded-xl py-3 px-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-sky-500/40 data-[state=inactive]:hover:bg-muted/60 transition-all flex-shrink-0"
+              value="history-cards" 
+              className="flex items-center gap-2 rounded-xl py-2.5 px-4 text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-sky-500/40 data-[state=inactive]:hover:bg-muted/60 transition-all whitespace-nowrap"
             >
-              <FileText className="w-5 h-5" />
-              <span className="hidden sm:inline">{t("dashboard.medicalHistory")}</span>
-              <span className="sm:hidden">{t("dashboard.medicalHistoryShort")}</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="nurse-care" 
-              className="flex items-center gap-2 rounded-xl py-3 px-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-amber-500/40 data-[state=inactive]:hover:bg-muted/60 transition-all flex-shrink-0"
-            >
-              <FileText className="w-5 h-5" />
-              <span className="hidden sm:inline">{t("client.tabs.nurseCare")}</span>
-              <span className="sm:hidden">{t("client.tabs.nurseCareShort")}</span>
+              <FileText className="w-4 h-4" />
+              <span className="hidden sm:inline">{t("client.tabs.historyCards")}</span>
+              <span className="sm:hidden">{t("client.tabs.historyCardsShort")}</span>
             </TabsTrigger>
             <TabsTrigger 
               value="profile" 
-              className="flex items-center gap-2 rounded-xl py-3 px-3 text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-fuchsia-500 data-[state=active]:to-pink-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-pink-500/40 data-[state=inactive]:hover:bg-muted/60 transition-all flex-shrink-0"
+              className="flex items-center gap-2 rounded-xl py-2.5 px-4 text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-fuchsia-500 data-[state=active]:to-pink-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-pink-500/40 data-[state=inactive]:hover:bg-muted/60 transition-all whitespace-nowrap"
             >
-              <User className="w-5 h-5" />
-              <span className="hidden sm:inline">{t("dashboard.profile")}</span>
-              <span className="sm:hidden">{t("dashboard.profile")}</span>
+              <User className="w-4 h-4" />
+              <span>{t("dashboard.profile")}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -156,12 +144,8 @@ console.log(me);
             {me && <PetsManager userId={String(me.id)} role={me.role ?? "CLIENT"} />}
           </TabsContent>
 
-          <TabsContent value="cards" className="space-y-5 animate-fade-in">
-            {me && <MedicalCardsViewer userId={String(me.id)} />}
-          </TabsContent>
-
-          <TabsContent value="nurse-care" className="space-y-5 animate-fade-in">
-            <NurseCareCardsViewer />
+          <TabsContent value="history-cards" className="space-y-5 animate-fade-in">
+            {me && <HistoryCardsViewer userId={String(me.id)} />}
           </TabsContent>
 
           <TabsContent value="profile" className="space-y-5 animate-fade-in">

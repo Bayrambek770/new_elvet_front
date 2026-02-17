@@ -12,11 +12,13 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useLogin } from "@/hooks/api";
 import { Me, Users, type MeResponse } from "@/lib/api";
 import { getRoleFromAccessToken, getUserIdFromAccessToken, tokenStore } from "@/lib/apiClient";
+import { useQueryClient } from "@tanstack/react-query";
 
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
 
   const [apiLogin, setApiLogin] = useState({ phone_number: "", password: "" });
   const [phoneError, setPhoneError] = useState<string | null>(null);
@@ -59,6 +61,10 @@ const Auth = () => {
     }
     try {
       await apiLoginMutate({ phone_number: normalized, password: apiLogin.password });
+      // Ensure cache is cleared and invalidated (useLogin hook handles this, but double-check)
+      queryClient.clear();
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      
       let role: string | undefined = undefined;
       try {
         const me: MeResponse = await Me.get();

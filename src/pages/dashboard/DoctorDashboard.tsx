@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Heart, LogOut, FileText, Users, Calendar, Clock, RefreshCcw, Package, Pill, BedDouble, User, Image as ImageIcon, Stethoscope, Paperclip, Download, ExternalLink } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -16,18 +15,50 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { tokenStore, api } from "@/lib/apiClient";
 import { SalaryHistory } from "@/lib/api";
 import elvetLogo from "@/assets/elvet_logo.jpg";
+import { DoctorSidebar, DoctorSidebarView } from "@/components/doctor/DoctorSidebar";
 // No direct typed helpers used here; relying on api client endpoints
 import { useMe } from "@/hooks/api";
 
 const DoctorDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isPublic = new URLSearchParams(location.search).get("public") === "1";
   const { toast } = useToast();
   const { t, i18n } = useTranslation();
   const { data: me } = useMe();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(true);
+
+  // Sidebar state with localStorage persistence
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem("doctorSidebarOpen");
+    return saved === "true";
+  });
+
+  // Active view from URL query params
+  const [activeView, setActiveView] = useState<DoctorSidebarView>(() => {
+    const viewParam = searchParams.get("view");
+    const validViews: DoctorSidebarView[] = ["main", "clients", "services", "medicines", "history", "rooms", "salary"];
+    return validViews.includes(viewParam as DoctorSidebarView) ? (viewParam as DoctorSidebarView) : "main";
+  });
+
+  // Persist sidebar state
+  useEffect(() => {
+    localStorage.setItem("doctorSidebarOpen", String(sidebarOpen));
+  }, [sidebarOpen]);
+
+  // Handle view navigation
+  const handleNavigate = useCallback((view: DoctorSidebarView) => {
+    setActiveView(view);
+    if (view === "main") {
+      searchParams.delete("view");
+    } else {
+      searchParams.set("view", view);
+    }
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   // Current doctor profile id (Doctor model primary key)
   const [doctorId, setDoctorId] = useState<number | null>(null);
   const [doctorIdLoading, setDoctorIdLoading] = useState(false);
@@ -198,6 +229,12 @@ const DoctorDashboard = () => {
   const [selectedServices, setSelectedServices] = useState<Record<number, ServiceSelection>>({});
   const [selectedMedicines, setSelectedMedicines] = useState<Record<number, MedicineSelection>>({});
   const [selectedFeeds, setSelectedFeeds] = useState<Record<number, number>>({});
+  // Assigned nurse for medical card (required)
+  const [assignedNurseId, setAssignedNurseId] = useState<number | null>(null);
+  const [formNurses, setFormNurses] = useState<ApiNurse[]>([]);
+  const [formNursesLoading, setFormNursesLoading] = useState(false);
+  const [formNursesError, setFormNursesError] = useState<string | null>(null);
+
   // Pets list for client
   const [petsList, setPetsList] = useState<ApiPet[]>([]);
   const [petsLoading, setPetsLoading] = useState(false);
@@ -835,6 +872,7 @@ const DoctorDashboard = () => {
     setFormSearchService(""); setFormSearchMedicine(""); setFormSearchFeed("");
     setSelectedPetId(null); setBloodPressure(""); setMucousMembrane(""); setHeartRate(""); setRespiratoryRate(""); setChestCondition(""); setNotes("");
     setShowPetCreateForm(false); setNewPetName(""); setNewPetSpecies(null); setNewPetGender(null); setNewPetBreed(""); setNewPetBirthDate(""); setNewPetColor(""); setNewPetWeight(""); setNewPetDescription(""); setPetCreateError(null);
+    setAssignedNurseId(null); setFormNursesError(null);
   };
 
   // Load catalogs when create-card modal opens
@@ -853,6 +891,14 @@ const DoctorDashboard = () => {
           }
   }).catch(() => setPetsError(t('doctor.pet.loadError'))).finally(() => setPetsLoading(false));
       }
+      // Load nurses for assignment
+      setFormNursesLoading(true); setFormNursesError(null);
+      api.get('nurses/').then(r => {
+        const data = r.data;
+        const results = Array.isArray(data) ? data : (Array.isArray(data?.results) ? data.results : []);
+        setFormNurses(results);
+      }).catch(() => setFormNursesError(t('doctor.create.nursesLoadError'))).finally(() => setFormNursesLoading(false));
+      
       setFormServicesLoading(true);
       setFormMedicinesLoading(true);
       setFormFeedsLoading(true);
@@ -941,6 +987,7 @@ const DoctorDashboard = () => {
   const handleSaveMedicalCard = async () => {
     if (!selectedClient) { toast({ title: t('doctor.create.validation.selectClient'), variant: "destructive" }); return; }
     if (!selectedPetId) { toast({ title: t('doctor.create.validation.selectPet'), variant: "destructive" }); return; }
+    if (!assignedNurseId) { toast({ title: t('doctor.create.validation.selectNurse'), variant: "destructive" }); return; }
     if (!diagnosis.trim()) { toast({ title: t('doctor.create.validation.diagnosis'), variant: "destructive" }); return; }
     // Required numeric vitals
     const weightNum = Number(weight);
@@ -979,6 +1026,7 @@ const DoctorDashboard = () => {
       client: Number(selectedClient.id),
       doctor: doctorId,
       pet: selectedPetId,
+      assigned_nurse: assignedNurseId,
       diagnosis: diagnosis.trim(),
       analyze: analyses.trim() || undefined,
       general_condition: symptoms.trim() || undefined,
@@ -1435,10 +1483,18 @@ const DoctorDashboard = () => {
   };
 
   // Resolve Doctor model id robustly for current user
+  // The doctor ID for creating medical cards is the user's ID when they have the DOCTOR role
   useEffect(() => {
     let cancelled = false;
     const resolveDoctorId = async () => {
       if (!me?.id || doctorId) return;
+      
+      // If user has DOCTOR role, their user ID is used as the doctor ID for medical cards
+      if (me.role === 'DOCTOR') {
+        setDoctorId(me.id);
+        return;
+      }
+      
       setDoctorIdLoading(true);
       const trySet = (data: any) => {
         const id = typeof data?.id === 'number' ? data.id : (typeof data?.doctor?.id === 'number' ? data.doctor.id : null);
@@ -1447,9 +1503,8 @@ const DoctorDashboard = () => {
       };
       try {
         let id = null;
-        try { id = trySet((await api.get('doctors/me/')).data); } catch {}
-        if (!id) { try { id = trySet((await api.get(`doctors/by-user/${me.id}/`)).data); } catch {} }
-        if (!id) { try { id = trySet((await api.get(`doctors/${me.id}/`)).data); } catch {} }
+        // Try to get doctor profile by user ID
+        try { id = trySet((await api.get(`doctors/${me.id}/`)).data); } catch {}
         if (!id && !cancelled) {
           toast({ title: t('doctor.profile.notFoundTitle'), description: t('doctor.profile.notFoundDescription'), variant: 'destructive' });
         }
@@ -1606,201 +1661,164 @@ const DoctorDashboard = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
-      {/* Header */}
-      <header className="border-b bg-background/80 backdrop-blur-md sticky top-0 z-50 animate-fade-in">
-        <div className="container px-4 py-4 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="flex items-center gap-3 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary transition hover:opacity-90 hover-scale"
-            aria-label={t("common.goHome")}
-          >
-            <img src={elvetLogo} alt="ELVET" className="w-12 h-12 rounded-xl object-cover shadow-glow border border-white/30" />
-            <div className="text-left">
-              <h1 className="text-xl font-bold bg-gradient-hero bg-clip-text text-transparent">ELVET</h1>
-              <p className="text-xs text-muted-foreground">{t("dashboard.doctor")}</p>
-            </div>
-          </button>
-          <div className="flex items-center gap-3">
-            <LanguageSwitcher />
-            <Button variant="outline" onClick={refreshAll} disabled={refreshing} className="gap-2 hover-scale">
-              <RefreshCcw className={`w-4 h-4 ${refreshing ? 'animate-spin-slow' : ''}`} />
-              {refreshing ? 'Updating…' : 'Update'}
-            </Button>
-            <Button variant="outline" onClick={handleLogout} className="gap-2 hover-scale">
-              <LogOut className="w-4 h-4" />
-              {t("dashboard.logout")}
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div className="container px-4 py-8">
-        {/* Hero Welcome Card (matches client style with inline image change) */}
-        <Card className="overflow-hidden border-0 shadow-elegant animate-fade-in mb-8">
-          <div className="bg-gradient-hero p-8 text-primary-foreground relative">
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnoiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4xIi8+PC9nPjwvc3ZnPg==')] opacity-20" />
-            <div className="relative flex items-center gap-4">
-              <div className="p-2 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-white/40 flex items-center justify-center relative group">
-                  {me?.image ? (
-                    // eslint-disable-next-line jsx-a11y/alt-text
-                    <img src={me.image} alt="avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-10 h-10" />
-                  )}
-                  {/* Inline image change button */}
-                  <label className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleDoctorBannerImageChange(e.target.files?.[0])} />
-                    <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/90 text-black px-3 py-1 rounded-full shadow">
-                      <ImageIcon className="w-4 h-4" /> {bannerUploading ? t('doctor.banner.loading') : t('doctor.banner.edit')}
-                    </span>
-                  </label>
-                </div>
-              </div>
-              <div>
-                <h2 className="text-3xl font-bold mb-1">
-                  {t("dashboard.welcome")}, {me?.first_name ? `${me.first_name}` : t('doctor.hero.fallbackRole')}! 👨‍⚕️
-                </h2>
-                <p className="text-primary-foreground/90 text-lg">{t('doctor.hero.subtitle')}</p>
+  // Render main dashboard view with metrics
+  const renderMainView = () => (
+    <>
+      {/* Hero Welcome Card (matches client style with inline image change) */}
+      <Card className="overflow-hidden border-0 shadow-elegant animate-fade-in mb-8">
+        <div className="bg-gradient-hero p-8 text-primary-foreground relative">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnoiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4xIi8+PC9nPjwvc3ZnPg==')] opacity-20" />
+          <div className="relative flex items-center gap-4">
+            <div className="p-2 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-white/40 flex items-center justify-center relative group">
+                {me?.image ? (
+                  // eslint-disable-next-line jsx-a11y/alt-text
+                  <img src={me.image} alt="avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-10 h-10" />
+                )}
+                {/* Inline image change button */}
+                <label className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleDoctorBannerImageChange(e.target.files?.[0])} />
+                  <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/90 text-black px-3 py-1 rounded-full shadow">
+                    <ImageIcon className="w-4 h-4" /> {bannerUploading ? t('doctor.banner.loading') : t('doctor.banner.edit')}
+                  </span>
+                </label>
               </div>
             </div>
+            <div>
+              <h2 className="text-3xl font-bold mb-1">
+                {t("dashboard.welcome")}, {me?.first_name ? `${me.first_name}` : t('doctor.hero.fallbackRole')}! 👨‍⚕️
+              </h2>
+              <p className="text-primary-foreground/90 text-lg">{t('doctor.hero.subtitle')}</p>
+            </div>
           </div>
-        </Card>
-
-  {/* Dynamic Inventory + Daily Salary Grid */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-blue-500/5 to-blue-500/10">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground"><Package className="w-4 h-4" /> {t('doctor.stats.services.title')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-blue-600">{counts.loading ? "…" : counts.services}</div>
-              <p className="text-xs text-muted-foreground mt-1">{t('doctor.stats.services.subtitle')}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-purple-500/5 to-purple-500/10" style={{ animationDelay: "60ms" }}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground"><Pill className="w-4 h-4" /> {t('doctor.stats.medicines.title')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-purple-600">{counts.loading ? "…" : counts.medicines}</div>
-              <p className="text-xs text-muted-foreground mt-1">{t('doctor.stats.medicines.subtitle')}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-orange-500/5 to-orange-500/10" style={{ animationDelay: "120ms" }}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground"><Heart className="w-4 h-4" /> {t('doctor.stats.feeds.title')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-orange-600">{counts.loading ? "…" : counts.feeds}</div>
-              <p className="text-xs text-muted-foreground mt-1">{t('doctor.stats.feeds.subtitle')}</p>
-            </CardContent>
-          </Card>
-          <Card
-            className="md:col-span-1 lg:col-span-1 xl:col-span-1 border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-green-500/5 to-green-500/10 cursor-pointer"
-            style={{ animationDelay: "180ms" }}
-            role="button"
-            tabIndex={0}
-            onClick={() => setSalaryOpen((o) => !o)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSalaryOpen((o) => !o); }
-            }}
-            aria-expanded={salaryOpen}
-            aria-controls="salary-history-dropdown"
-          >
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground"><Stethoscope className="w-4 h-4" /> {t('doctor.salary.today')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">{counts.loading ? "…" : formatSalary(counts.doctorDailySalary)}</div>
-              <p className="text-xs text-muted-foreground mt-1">{t('doctor.salary.total')}</p>
-            </CardContent>
-          </Card>
         </div>
+      </Card>
 
-        {/* Salary history dropdown (weekly/monthly) */}
-        <div
-          id="salary-history-dropdown"
-          className="transition-all duration-300 overflow-hidden mb-8"
-          style={{ maxHeight: salaryOpen ? 1000 : 0, opacity: salaryOpen ? 1 : 0 }}
-          aria-hidden={!salaryOpen}
-        >
-        <Card className="border-2 hover:shadow-glow transition-all animate-fade-in">
-          <CardHeader className="pb-2 flex items-center justify-between">
-            <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-              <Stethoscope className="w-4 h-4" /> {salaryPeriod === 'weekly' ? t('doctor.salary.weekly') : t('doctor.salary.monthly')}
-            </CardTitle>
-            <Select value={salaryPeriod} onValueChange={(v) => setSalaryPeriod(v as any)}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder={t('doctor.salary.dropdown.weekly')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="weekly">{t('doctor.salary.dropdown.weekly')}</SelectItem>
-                <SelectItem value="monthly">{t('doctor.salary.dropdown.monthly')}</SelectItem>
-              </SelectContent>
-            </Select>
+      {/* Dynamic Inventory + Daily Salary Grid */}
+      <div className="grid md:grid-cols-4 gap-6 mb-8">
+        <Card className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-blue-500/5 to-blue-500/10">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground"><Package className="w-4 h-4" /> {t('doctor.stats.services.title')}</CardTitle>
           </CardHeader>
           <CardContent>
-            {salaryLoading ? (
-              <div className="text-sm text-muted-foreground">{t('doctor.salary.loading')}</div>
-            ) : salaryError ? (
-              <div className="text-sm text-destructive">{t('doctor.salary.error')}: {salaryError}</div>
-            ) : (
-              <>
-                <div className="flex items-baseline gap-2 mb-3">
-                  <div className="text-2xl font-bold">{formatSalary(salaryTotal)}</div>
-                  <div className="text-xs text-muted-foreground">{t('doctor.salary.total')}</div>
-                </div>
-                 {salaryDailyTotals.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">{t('doctor.salary.empty')}</div>
-                ) : (
-                  <div className="space-y-2">
-                    {salaryDailyTotals.map(({ key, date, total }) => (
-                      <div key={key} className="flex items-center justify-between text-sm border rounded-lg p-2">
-                        <div className="text-muted-foreground">{formatDayLabel(date)}</div>
-                        <div className="font-medium">{formatSalary(total)}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
+            <div className="text-3xl font-bold text-blue-600">{counts.loading ? "…" : counts.services}</div>
+            <p className="text-xs text-muted-foreground mt-1">{t('doctor.stats.services.subtitle')}</p>
           </CardContent>
         </Card>
-        </div>
+        <Card className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-purple-500/5 to-purple-500/10" style={{ animationDelay: "60ms" }}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground"><Pill className="w-4 h-4" /> {t('doctor.stats.medicines.title')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-purple-600">{counts.loading ? "…" : counts.medicines}</div>
+            <p className="text-xs text-muted-foreground mt-1">{t('doctor.stats.medicines.subtitle')}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-orange-500/5 to-orange-500/10" style={{ animationDelay: "120ms" }}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground"><Heart className="w-4 h-4" /> {t('doctor.stats.feeds.title')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-orange-600">{counts.loading ? "…" : counts.feeds}</div>
+            <p className="text-xs text-muted-foreground mt-1">{t('doctor.stats.feeds.subtitle')}</p>
+          </CardContent>
+        </Card>
+        <Card
+          className="md:col-span-1 lg:col-span-1 xl:col-span-1 border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-green-500/5 to-green-500/10 cursor-pointer"
+          style={{ animationDelay: "180ms" }}
+          role="button"
+          tabIndex={0}
+          onClick={() => handleNavigate("salary")}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleNavigate("salary"); }
+          }}
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground"><Stethoscope className="w-4 h-4" /> {t('doctor.salary.today')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-600">{counts.loading ? "…" : formatSalary(counts.doctorDailySalary)}</div>
+            <p className="text-xs text-muted-foreground mt-1">{t('doctor.salary.total')}</p>
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  );
 
-  {/* Dashboard Tabs */}
-        <Tabs defaultValue="clients" className="w-full">
-          <TabsList className="w-full mb-8 h-auto p-1 rounded-xl bg-muted/40 flex flex-wrap gap-2 overflow-x-auto">
-            <TabsTrigger value="clients" className="gap-2 py-3 px-3 text-sm flex items-center justify-center flex-shrink-0">
-              <Users className="w-4 h-4" />
-              {t('doctor.tabs.clients')}
-            </TabsTrigger>
-            <TabsTrigger value="services-list" className="gap-2 py-3 px-3 text-sm flex items-center justify-center flex-shrink-0">
-              <Package className="w-4 h-4" />
-              {t('doctor.tabs.services')}
-            </TabsTrigger>
-            <TabsTrigger value="medicines-list" className="gap-2 py-3 px-3 text-sm flex items-center justify-center flex-shrink-0">
-              <Pill className="w-4 h-4" />
-              {t('doctor.tabs.medicines')}
-            </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2 py-3 px-3 text-sm flex items-center justify-center flex-shrink-0">
-              <FileText className="w-4 h-4" />
-              {t('doctor.tabs.history')}
-            </TabsTrigger>
-            <TabsTrigger value="rooms" className="gap-2 py-3 px-3 text-sm flex items-center justify-center flex-shrink-0">
-              <BedDouble className="w-4 h-4" />
-              {t('doctor.tabs.rooms')}
-            </TabsTrigger>
-          </TabsList>
+  // Render salary view
+  const renderSalaryView = () => (
+    <div className="space-y-6 animate-fade-in">
+      <Card className="border-2 hover:shadow-glow transition-all">
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
+            <Stethoscope className="w-4 h-4" /> {salaryPeriod === 'weekly' ? t('doctor.salary.weekly') : t('doctor.salary.monthly')}
+          </CardTitle>
+          <Select value={salaryPeriod} onValueChange={(v) => setSalaryPeriod(v as any)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder={t('doctor.salary.dropdown.weekly')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="weekly">{t('doctor.salary.dropdown.weekly')}</SelectItem>
+              <SelectItem value="monthly">{t('doctor.salary.dropdown.monthly')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardHeader>
+        <CardContent>
+          {salaryLoading ? (
+            <div className="text-sm text-muted-foreground">{t('doctor.salary.loading')}</div>
+          ) : salaryError ? (
+            <div className="text-sm text-destructive">{t('doctor.salary.error')}: {salaryError}</div>
+          ) : (
+            <>
+              <div className="flex items-baseline gap-2 mb-3">
+                <div className="text-2xl font-bold">{formatSalary(salaryTotal)}</div>
+                <div className="text-xs text-muted-foreground">{t('doctor.salary.total')}</div>
+              </div>
+              {salaryDailyTotals.length === 0 ? (
+                <div className="text-sm text-muted-foreground">{t('doctor.salary.empty')}</div>
+              ) : (
+                <div className="space-y-2">
+                  {salaryDailyTotals.map(({ key, date, total }) => (
+                    <div key={key} className="flex items-center justify-between text-sm border rounded-lg p-2">
+                      <div className="text-muted-foreground">{formatDayLabel(date)}</div>
+                      <div className="font-medium">{formatSalary(total)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 
+  // Render content based on active view
+  const renderContent = () => {
+    switch (activeView) {
+      case "salary":
+        return renderSalaryView();
+      case "clients":
+        return renderClientsView();
+      case "services":
+        return renderServicesView();
+      case "medicines":
+        return renderMedicinesView();
+      case "history":
+        return renderHistoryView();
+      case "rooms":
+        return renderRoomsView();
+      case "main":
+      default:
+        return renderMainView();
+    }
+  };
 
-          {/* Clients list with search & pagination */}
-          <TabsContent value="clients" className="space-y-4 animate-fade-in">
+  // Render clients view
+  const renderClientsView = () => (
+    <div className="space-y-4 animate-fade-in">
             <Card className="border-2">
               <CardHeader className="pb-2">
                 <CardTitle>{t('doctor.clients.title')}</CardTitle>
@@ -1868,20 +1886,35 @@ const DoctorDashboard = () => {
                   <div className="space-y-6">
                     {/* Client summary (dynamic) */}
                     <Card className="border">
-                      <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                        <div>
-                          <CardTitle className="text-lg">{clientDetailLoading ? t('common.loading') : (clientDetail ? `${clientDetail.first_name || ''} ${clientDetail.last_name || ''}`.trim() || selectedClient.name : selectedClient.name)}</CardTitle>
-                          <CardDescription>
-                            {t('doctor.clientProfile.phone')} {clientDetail?.phone_number || selectedClient.phone || '—'}
-                            {clientDetail?.address && <span className="block">{t('doctor.clientProfile.address')} {clientDetail.address}</span>}
-                            {clientDetail?.description && <span className="block">{t('doctor.clientProfile.description')} {clientDetail.description}</span>}
-                          </CardDescription>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" onClick={closeClientProfile}>{t('doctor.clientProfile.close')}</Button>
-                          <Button className="bg-gradient-hero" onClick={() => setCreateCardDialogOpen(true)}>
-                            {t('doctor.clientProfile.createCard')}
-                          </Button>
+                      <CardHeader className="pb-4">
+                        <div className="flex flex-col gap-4">
+                          <div>
+                            <CardTitle className="text-lg mb-2">{clientDetailLoading ? t('common.loading') : (clientDetail ? `${clientDetail.first_name || ''} ${clientDetail.last_name || ''}`.trim() || selectedClient.name : selectedClient.name)}</CardTitle>
+                            <div className="space-y-1 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{t('doctor.clientProfile.phone')}</span>
+                                <span>{clientDetail?.phone_number || selectedClient.phone || '—'}</span>
+                              </div>
+                              {clientDetail?.address && (
+                                <div className="flex items-start gap-2">
+                                  <span className="font-medium">{t('doctor.clientProfile.address')}</span>
+                                  <span>{clientDetail.address}</span>
+                                </div>
+                              )}
+                              {clientDetail?.description && (
+                                <div className="flex items-start gap-2">
+                                  <span className="font-medium">{t('doctor.clientProfile.description')}</span>
+                                  <span>{clientDetail.description}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2 pt-2 border-t">
+                            <Button variant="outline" onClick={closeClientProfile}>{t('doctor.clientProfile.close')}</Button>
+                            <Button className="bg-gradient-hero" onClick={() => setCreateCardDialogOpen(true)}>
+                              {t('doctor.clientProfile.createCard')}
+                            </Button>
+                          </div>
                         </div>
                       </CardHeader>
                     </Card>
@@ -2044,6 +2077,28 @@ const DoctorDashboard = () => {
                           </Card>
                         )}
                       </div>
+
+                      {/* Assigned Nurse selector (required) */}
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>{t('doctor.create.assignedNurseLabel')} *</Label>
+                        <Select value={assignedNurseId ? String(assignedNurseId) : undefined} onValueChange={(v) => setAssignedNurseId(Number(v))}>
+                          <SelectTrigger className={`${!assignedNurseId ? 'border-destructive focus-visible:ring-destructive' : ''}`}>
+                            <SelectValue placeholder={formNursesLoading ? t('common.loading') : t('doctor.create.assignedNursePlaceholder')} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {formNurses.map(n => {
+                              const name = (n.first_name || '') + (n.last_name ? (' ' + n.last_name) : '') || n.name || `ID ${n.id}`;
+                              return <SelectItem key={n.id} value={String(n.id)}>{name.trim() || `ID ${n.id}`}</SelectItem>;
+                            })}
+                            {!formNursesLoading && formNurses.length === 0 && (
+                              <div className="px-3 py-2 text-sm text-muted-foreground">{t('doctor.create.noNurses')}</div>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        {formNursesError && <div className="text-xs text-destructive">{formNursesError}</div>}
+                        {!assignedNurseId && <p className="text-xs text-destructive">Required</p>}
+                      </div>
+
                       <div className="space-y-2">
                         <Label htmlFor="weight">{t('doctor.vitals.weight')}</Label>
                         <Input id="weight" type="number" required value={weight} onChange={(e) => setWeight(e.target.value)} placeholder={t('doctor.vitals.weightPlaceholder')} className={`${!String(weight||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
@@ -2051,12 +2106,67 @@ const DoctorDashboard = () => {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="temperature">{t('doctor.vitals.temperature')}</Label>
-                        <Input id="temperature" type="number" required value={temperature} onChange={(e) => setTemperature(e.target.value)} placeholder={t('doctor.vitals.temperaturePlaceholder')} className={`${!String(temperature||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
+                        <Input 
+                          id="temperature" 
+                          type="text" 
+                          inputMode="decimal"
+                          required 
+                          value={temperature} 
+                          onChange={(e) => {
+                            let val = e.target.value;
+                            // Remove non-numeric except dot
+                            val = val.replace(/[^0-9.]/g, '');
+                            // Prevent multiple dots
+                            const dotCount = (val.match(/\./g) || []).length;
+                            if (dotCount > 1) {
+                              val = val.slice(0, val.lastIndexOf('.'));
+                            }
+                            // Auto-insert dot after 2 digits if no dot yet
+                            if (/^\d{2}$/.test(val) && !val.includes('.')) {
+                              val = val + '.';
+                            }
+                            // Limit to format like 38.5 or 39.12
+                            if (/^\d{0,2}(\.\d{0,2})?$/.test(val) || val === '') {
+                              setTemperature(val);
+                            }
+                          }} 
+                          placeholder={t('doctor.vitals.temperaturePlaceholder')} 
+                          className={`${!String(temperature||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} 
+                        />
                         {!String(temperature||'').trim() && <p className="text-xs text-destructive">Required</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="bloodp">{t('doctor.vitals.bloodPressure')}</Label>
-                        <Input id="bloodp" type="text" required value={bloodPressure} onChange={(e) => setBloodPressure(e.target.value)} placeholder={t('doctor.vitals.bloodPressurePlaceholder')} className={`${!String(bloodPressure||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
+                        <Input 
+                          id="bloodp" 
+                          type="text" 
+                          inputMode="numeric"
+                          required 
+                          value={bloodPressure} 
+                          onChange={(e) => {
+                            let val = e.target.value;
+                            // Allow only digits, spaces, and slash
+                            val = val.replace(/[^0-9\s/]/g, '');
+                            // Normalize multiple slashes to one
+                            val = val.replace(/\/+/g, ' / ');
+                            // Normalize multiple spaces
+                            val = val.replace(/\s+/g, ' ');
+                            setBloodPressure(val);
+                          }}
+                          onKeyDown={(e) => {
+                            // On ArrowRight, auto-insert " / " if we have digits and no slash yet
+                            if (e.key === 'ArrowRight') {
+                              const val = bloodPressure.trim();
+                              // If value is 2-3 digits only (no slash yet)
+                              if (/^\d{2,3}$/.test(val)) {
+                                e.preventDefault();
+                                setBloodPressure(val + ' / ');
+                              }
+                            }
+                          }}
+                          placeholder={t('doctor.vitals.bloodPressurePlaceholder')} 
+                          className={`${!String(bloodPressure||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} 
+                        />
                         {!String(bloodPressure||'').trim() && <p className="text-xs text-destructive">Required</p>}
                       </div>
                       <div className="space-y-2">
@@ -2491,10 +2601,12 @@ const DoctorDashboard = () => {
                 </div>
               </DialogContent>
             </Dialog>
-          </TabsContent>
+    </div>
+  );
 
-          {/* Services list with search & pagination */}
-          <TabsContent value="services-list" className="space-y-4 animate-fade-in">
+  // Render services view
+  const renderServicesView = () => (
+    <div className="space-y-4 animate-fade-in">
             <Card className="border-2">
               <CardHeader className="pb-2">
                 <CardTitle>{t('doctor.servicesList.title')}</CardTitle>
@@ -2540,10 +2652,12 @@ const DoctorDashboard = () => {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+    </div>
+  );
 
-          {/* Medicines list with search & pagination */}
-          <TabsContent value="medicines-list" className="space-y-4 animate-fade-in">
+  // Render medicines view
+  const renderMedicinesView = () => (
+    <div className="space-y-4 animate-fade-in">
             <Card className="border-2">
               <CardHeader className="pb-2">
                 <CardTitle>{t('doctor.medicinesList.title')}</CardTitle>
@@ -2588,10 +2702,12 @@ const DoctorDashboard = () => {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+    </div>
+  );
 
-          {/* Doctor history cards (API) with pagination */}
-          <TabsContent value="history" className="space-y-4 animate-fade-in">
+  // Render history view
+  const renderHistoryView = () => (
+    <div className="space-y-4 animate-fade-in">
             <Card className="border-2">
               <CardHeader className="pb-2">
                 <CardTitle>{t('doctor.history.title')}</CardTitle>
@@ -2643,10 +2759,12 @@ const DoctorDashboard = () => {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+    </div>
+  );
 
-          {/* Available stationary rooms grid (API) with pagination */}
-          <TabsContent value="rooms" className="space-y-4 animate-fade-in">
+  // Render rooms view
+  const renderRoomsView = () => (
+    <div className="space-y-4 animate-fade-in">
             <Card className="border-2">
               <CardHeader className="pb-2">
                 <CardTitle>{t('doctor.rooms.title')}</CardTitle>
@@ -2684,29 +2802,78 @@ const DoctorDashboard = () => {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+    </div>
+  );
 
-        {/* Edit Medical Card Modal */}
-        <Dialog open={editCardDialogOpen} onOpenChange={(open) => {
-          if (!open && editCardSaving) return; setEditCardDialogOpen(open);
-        }}>
-          <DialogContent className="w-full max-w-[900px] max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
-            <DialogHeader>
-              <DialogTitle className="text-2xl">{t('doctor.edit.title')}</DialogTitle>
-              <DialogDescription>{t('doctor.edit.subtitle')}</DialogDescription>
-            </DialogHeader>
+  return (
+    <div className="flex min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
+      {/* Sidebar Navigation */}
+      <DoctorSidebar
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        activeView={activeView}
+        onNavigate={handleNavigate}
+      />
 
-            {editCardLoading ? (
-              <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
-            ) : (
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="ed_diag">{t('doctor.vitals.diagnosis')}</Label>
-                  <Textarea id="ed_diag" required value={editDiagnosis} onChange={(e) => setEditDiagnosis(e.target.value)} placeholder={t('doctor.vitals.diagnosisPlaceholder')} className={`${!String(editDiagnosis||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                  {!String(editDiagnosis||'').trim() && <p className="text-xs text-destructive">Required</p>}
-                </div>
-                <div className="space-y-2 md:col-span-2">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+        {/* Header */}
+        <header className="border-b bg-background/80 backdrop-blur-md sticky top-0 z-40 animate-fade-in">
+          <div className="px-4 md:px-6 py-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="flex items-center gap-3 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary transition hover:opacity-90 hover-scale"
+              aria-label={t("common.goHome")}
+            >
+              <img src={elvetLogo} alt="ELVET" className="w-10 h-10 md:w-12 md:h-12 rounded-xl object-cover shadow-glow border border-white/30" />
+              <div className="text-left hidden sm:block">
+                <h1 className="text-xl font-bold bg-gradient-hero bg-clip-text text-transparent">ELVET</h1>
+                <p className="text-xs text-muted-foreground">{t("dashboard.doctor")}</p>
+              </div>
+            </button>
+            <div className="flex items-center gap-2 md:gap-3">
+              <LanguageSwitcher />
+              <Button variant="outline" onClick={refreshAll} disabled={refreshing} className="gap-2 hover-scale" size="sm">
+                <RefreshCcw className={`w-4 h-4 ${refreshing ? 'animate-spin-slow' : ''}`} />
+                <span className="hidden sm:inline">{refreshing ? 'Updating…' : 'Update'}</span>
+              </Button>
+              <Button variant="outline" onClick={handleLogout} className="gap-2 hover-scale" size="sm">
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">{t("dashboard.logout")}</span>
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Scrollable Content */}
+        <main className="flex-1 overflow-auto">
+          <div className="p-4 md:p-6 lg:p-8">
+            {renderContent()}
+          </div>
+        </main>
+      </div>
+
+      {/* Edit Medical Card Modal */}
+      <Dialog open={editCardDialogOpen} onOpenChange={(open) => {
+        if (!open && editCardSaving) return; setEditCardDialogOpen(open);
+      }}>
+        <DialogContent className="w-full max-w-[900px] max-h-[90vh] overflow-y-auto" onInteractOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="text-2xl">{t('doctor.edit.title')}</DialogTitle>
+            <DialogDescription>{t('doctor.edit.subtitle')}</DialogDescription>
+          </DialogHeader>
+
+          {editCardLoading ? (
+            <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
+          ) : (
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="ed_diag">{t('doctor.vitals.diagnosis')}</Label>
+                <Textarea id="ed_diag" required value={editDiagnosis} onChange={(e) => setEditDiagnosis(e.target.value)} placeholder={t('doctor.vitals.diagnosisPlaceholder')} className={`${!String(editDiagnosis||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
+                {!String(editDiagnosis||'').trim() && <p className="text-xs text-destructive">Required</p>}
+              </div>
+              <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="ed_an">{t('doctor.vitals.analyses')}</Label>
                   <Textarea id="ed_an" required value={editAnalyses} onChange={(e) => setEditAnalyses(e.target.value)} placeholder={t('doctor.vitals.analysesPlaceholder')} className={`${!String(editAnalyses||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
                   {!String(editAnalyses||'').trim() && <p className="text-xs text-destructive">Required</p>}
@@ -3181,7 +3348,6 @@ const DoctorDashboard = () => {
             )}
           </DialogContent>
         </Dialog>
-      </div>
     </div>
   );
 };

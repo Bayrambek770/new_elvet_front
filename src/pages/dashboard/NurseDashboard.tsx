@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
 import {
   LogOut,
   Calendar,
@@ -17,6 +17,7 @@ import {
   PawPrint,
   RefreshCcw,
   Loader2,
+  Search,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -24,6 +25,8 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { Badge } from "@/components/ui/badge";
 import { HospitalizationTasks } from "@/components/nurse/HospitalizationTasks";
 import { NurseCareCardsManager } from "@/components/nurse/NurseCareCardsManager";
+import { MedicalCardsForNurse } from "@/components/nurse/MedicalCardsForNurse";
+import { Sidebar, SidebarView } from "@/components/nurse/Sidebar";
 import { tokenStore, api } from "@/lib/apiClient";
 import { useMe } from "@/hooks/api";
 import { Tasks } from "@/lib/api";
@@ -33,6 +36,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 const NurseDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isPublic = new URLSearchParams(location.search).get("public") === "1";
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -53,12 +57,42 @@ const NurseDashboard = () => {
   const [doneTasks, setDoneTasks] = useState<any[]>([]);
   const [doneTodayTasks, setDoneTodayTasks] = useState<any[]>([]);
   const [medicinesList, setMedicinesList] = useState<any[]>([]);
+  const [medicinesSearch, setMedicinesSearch] = useState("");
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [salaryLoading, setSalaryLoading] = useState(false);
   const [salaryWeekly, setSalaryWeekly] = useState<any[]>([]);
   const [salaryMonthly, setSalaryMonthly] = useState<any[]>([]);
   const [initialFetchComplete, setInitialFetchComplete] = useState(false);
+
+  // Sidebar state with localStorage persistence
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem("nurseSidebarOpen");
+    return saved === "true";
+  });
+
+  // Active view from URL query params
+  const [activeView, setActiveView] = useState<SidebarView>(() => {
+    const viewParam = searchParams.get("view");
+    const validViews: SidebarView[] = ["main", "procedures", "medical-cards", "nurse-care", "medicines", "schedule", "salary"];
+    return validViews.includes(viewParam as SidebarView) ? (viewParam as SidebarView) : "main";
+  });
+
+  // Persist sidebar state
+  useEffect(() => {
+    localStorage.setItem("nurseSidebarOpen", String(sidebarOpen));
+  }, [sidebarOpen]);
+
+  // Handle view navigation
+  const handleNavigate = useCallback((view: SidebarView) => {
+    setActiveView(view);
+    if (view === "main") {
+      searchParams.delete("view");
+    } else {
+      searchParams.set("view", view);
+    }
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const parseNumeric = (value: unknown): number | null => {
     if (value === null || value === undefined) return null;
@@ -96,6 +130,13 @@ const NurseDashboard = () => {
   useEffect(() => {
     if (isPublic) return;
     if (!me || nurseIdAttempted) return;
+    
+    // Only attempt to resolve nurse profile if user role is NURSE
+    const userRole = (me?.role || "").toString().toUpperCase();
+    if (userRole !== "NURSE") {
+      setNurseIdAttempted(true);
+      return;
+    }
 
     const profile = (me as any)?.profile ?? {};
     const directCandidates = [
@@ -117,59 +158,42 @@ const NurseDashboard = () => {
     }
 
     let cancelled = false;
-    let resolved = false;
-
-    const trySet = (data: any) => {
-      const possibleValues = [
-        data?.id,
-        data?.nurse?.id,
-        data?.nurse_id,
-        data?.profile?.id,
-        data?.profile?.nurse_id,
-      ];
-      for (const value of possibleValues) {
-        const parsed = parseId(value);
-        if (parsed && !cancelled) {
-          setNurseId(parsed);
-          resolved = true;
-          return true;
-        }
-      }
-      return false;
-    };
 
     const resolve = async () => {
+      // Backend confirmation: User ID is identical to Nurse ID.
+      // We accept me.id as the nurseId, but verify the profile exists via API.
+      const targetId = parseId(me.id);
+      
+      if (!targetId) {
+         setNurseIdAttempted(true);
+         return;
+      }
+
       try {
-        const endpoints = [`nurses/me/`, `nurses/by-user/${me.id}/`, `nurses/${me.id}/`];
-        for (const endpoint of endpoints) {
-          if (cancelled || resolved) break;
-          try {
-            // Suppress 404 console errors for expected endpoint failures
-            const { data } = await api.get(endpoint, { _suppress404: true } as any);
-            if (trySet(data)) break;
-          } catch (err: any) {
-            // Silently continue to next endpoint for 404s (expected)
-            // Only log unexpected errors (non-404)
-            if (err?.response?.status !== 404) {
-              console.warn(`Unexpected error fetching ${endpoint}:`, err);
-            }
-            // continue to next endpoint
-          }
+        // Verify the nurse profile exists using the canonical endpoint
+        await api.get(`nurses/${targetId}/`, { _suppress404: true } as any);
+        
+        if (!cancelled) {
+          setNurseId(targetId);
+          setNurseIdAttempted(true);
         }
+      } catch (err: any) {
         if (!cancelled) {
           setNurseIdAttempted(true);
-          if (!resolved) {
+          // If 404, the user exists but has no nurse profile
+          if (err?.response?.status === 404) {
             toast({
               title: t("nurse.profileNotFound.title"),
               description: t("nurse.profileNotFound.description"),
               variant: "destructive",
             });
             setInitialFetchComplete(true);
+          } else {
+             // For other errors (network, etc.), assume the ID is valid to allow retry or offline viewing
+             // and avoid blocking the user completely.
+             console.warn("Error verifying nurse profile, proceeding with ID:", err);
+             setNurseId(targetId);
           }
-        }
-      } finally {
-        if (cancelled && !nurseIdAttempted) {
-          setNurseIdAttempted(true);
         }
       }
     };
@@ -405,7 +429,7 @@ const NurseDashboard = () => {
 
     const normalizeUnit = (item: any) => item?.unit || item?.unit_name || item?.measure || item?.measurement || "";
 
-    return medicinesList.map((item: any, index) => ({
+    const allMedicines = medicinesList.map((item: any, index) => ({
       id: item?.id ?? index,
       name: normalizeName(item),
       category: normalizeCategory(item),
@@ -413,7 +437,21 @@ const NurseDashboard = () => {
       unit: normalizeUnit(item),
       updatedAt: item?.updated_at || item?.updatedAt || item?.updated,
     }));
-  }, [medicinesList]);
+
+    // Apply search filter
+    if (!medicinesSearch.trim()) {
+      return allMedicines;
+    }
+
+    const searchLower = medicinesSearch.toLowerCase().trim();
+    return allMedicines.filter((medicine) => 
+      medicine.name.toLowerCase().includes(searchLower) ||
+      medicine.category.toLowerCase().includes(searchLower)
+    );
+  }, [medicinesList, medicinesSearch, t]);
+
+  // Total medicines count for display (before filtering)
+  const totalMedicinesCount = medicinesList.length;
 
   const scheduleGroups = useMemo(() => {
     const allTasks = [...todoTasks, ...doneTodayTasks, ...doneTasks];
@@ -511,28 +549,12 @@ const NurseDashboard = () => {
         subtitle: t('nurse.metrics.doneToday.subtitle'),
       },
       {
-        key: "done",
-        label: t('nurse.metrics.done.label'),
-        value: nurseId && !isPublic ? metrics.done : null,
-        formatter: formatNumber,
-        icon: CheckCircle2,
-        subtitle: t('nurse.metrics.done.subtitle'),
-      },
-      {
         key: "medicines",
         label: t('nurse.metrics.medicines.label'),
         value: isPublic ? null : metrics.medicines,
         formatter: formatNumber,
         icon: Pill,
         subtitle: t('nurse.metrics.medicines.subtitle'),
-      },
-      {
-        key: "pets",
-        label: t('nurse.metrics.roomsTaken.label'),
-        value: isPublic ? null : metrics.pets,
-        formatter: formatNumber,
-        icon: PawPrint,
-        subtitle: t('nurse.metrics.roomsTaken.subtitle'),
       },
     ],
     [dailySalary, metrics, nurseId, isPublic, t]
@@ -573,158 +595,12 @@ const NurseDashboard = () => {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
-      <header className="border-b bg-background/80 backdrop-blur-md sticky top-0 z-50 animate-fade-in">
-        <div className="container px-4 py-4 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="flex items-center gap-3 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary transition hover:opacity-90 hover-scale"
-            aria-label={t('common.goHome')}
-          >
-            <img src={elvetLogo} alt="ELVET" className="w-12 h-12 rounded-xl object-cover shadow-glow border border-white/30" />
-            <div className="text-left">
-              <h1 className="text-xl font-bold bg-gradient-hero bg-clip-text text-transparent">ELVET</h1>
-              <p className="text-xs text-muted-foreground">{t("dashboard.nurse")}</p>
-            </div>
-          </button>
-          <div className="flex items-center gap-3">
-            <LanguageSwitcher />
-            <Button variant="outline" onClick={handleLogout} className="gap-2 hover-scale">
-              <LogOut className="w-4 h-4" />
-              {t("dashboard.logout")}
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <div className="container px-4 py-8">
-        <Card className="overflow-hidden border-0 shadow-elegant animate-fade-in mb-8">
-          <div className="bg-gradient-hero p-8 text-primary-foreground relative">
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnoiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4xIi8+PC9nPjwvc3ZnPg==')] opacity-20" />
-            <div className="relative flex items-center gap-4">
-              <div className="p-2 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-white/40 flex items-center justify-center relative group">
-                  {me?.image ? (
-                    // eslint-disable-next-line jsx-a11y/alt-text
-                    <img src={me.image} alt="avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-10 h-10" />
-                  )}
-                  <label className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleBannerImageChange(e.target.files?.[0])} />
-                    <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/90 text-black px-3 py-1 rounded-full shadow">
-                      <ImageIcon className="w-4 h-4" /> {bannerUploading ? t('nurse.banner.uploading') : t('nurse.banner.changeImage')}
-                    </span>
-                  </label>
-                </div>
-              </div>
-              <div>
-                <h2 className="text-3xl font-bold mb-1">
-                  {t("dashboard.welcome")}, {me?.first_name ? `${me.first_name}` : t('nurse.banner.defaultName')}! 💉
-                </h2>
-                <p className="text-primary-foreground/90 text-lg">{t('nurse.banner.subtitle')}</p>
-                <p className="text-primary-foreground/80 text-sm mt-1">
-                  {t('nurse.banner.dailySalaryLabel')} <span className="font-semibold">{formatCurrency(dailySalary)}</span>
-                </p>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {showNurseWarning && (
-          <div className="mb-6 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
-            {t('nurse.profileNotFound.inlineWarning')}
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-          <h3 className="text-lg font-semibold text-muted-foreground">{t('nurse.metrics.title')}</h3>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={refreshDashboardData}
-            disabled={isRefreshing || !nurseId || isPublic}
-            className="gap-2"
-          >
-            <RefreshCcw className="w-4 h-4" />
-            {t('nurse.metrics.refresh')}
-          </Button>
-        </div>
-
-        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4 mb-8">
-          {statsConfig.map(({ key, label, value, formatter, icon: Icon, subtitle }) => (
-            <Card
-              key={key}
-              className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-emerald-50 via-background to-teal-50"
-            >
-              <CardHeader className="pb-3 flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary text-base">
-                    <Icon className="w-4 h-4" />
-                  </span>
-                  {label}
-                </CardTitle>
-                <span className="text-lg">✨</span>
-              </CardHeader>
-              <CardContent>
-                <div className={`text-3xl font-bold bg-gradient-to-r from-primary to-emerald-600 bg-clip-text text-transparent ${
-                  isRefreshing ? "opacity-70" : ""
-                }`}>
-                  {formatter(value)}
-                </div>
-                {subtitle && <p className="text-xs text-muted-foreground mt-2">{subtitle}</p>}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <Tabs defaultValue="procedures" className="w-full">
-          <TabsList className="w-full mb-8 h-auto p-1 rounded-2xl bg-card/80 shadow-md flex flex-wrap gap-2 overflow-x-auto">
-            <TabsTrigger
-              value="procedures"
-              className="gap-2 py-3 px-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all flex items-center justify-center flex-shrink-0"
-            >
-              <ClipboardList className="w-4 h-4" />
-              <span className="hidden sm:inline">{t("nurse.tabs.procedures")}</span>
-              <span className="sm:hidden">{t("nurse.tabs.procedures")}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="medicines"
-              className="gap-2 py-3 px-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500 data-[state=active]:to-indigo-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all flex items-center justify-center flex-shrink-0"
-            >
-              <Pill className="w-4 h-4" />
-              <span className="hidden sm:inline">{t("nurse.tabs.medicines")}</span>
-              <span className="sm:hidden">{t("nurse.tabs.medicines")}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="schedule"
-              className="gap-2 py-3 px-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all flex items-center justify-center flex-shrink-0"
-            >
-              <Calendar className="w-4 h-4" />
-              <span className="hidden sm:inline">{t("nurse.tabs.schedule")}</span>
-              <span className="sm:hidden">{t("nurse.tabs.schedule")}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="salary"
-              className="gap-2 py-3 px-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-fuchsia-500 data-[state=active]:to-pink-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all flex items-center justify-center flex-shrink-0"
-            >
-              <Wallet className="w-4 h-4" />
-              <span className="hidden sm:inline">{t("nurse.tabs.salaryHistory")}</span>
-              <span className="sm:hidden">{t("nurse.tabs.salaryHistory")}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="nurse-care"
-              className="gap-2 py-3 px-3 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-gradient-to-r data-[state=active]:from-rose-500 data-[state=active]:to-red-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:hover:bg-muted/60 transition-all flex items-center justify-center flex-shrink-0"
-            >
-              <ClipboardList className="w-4 h-4" />
-              <span className="hidden sm:inline">{t("nurse.tabs.nurseCare")}</span>
-              <span className="sm:hidden">{t("nurse.tabs.nurseCareShort")}</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="procedures" className="space-y-6 animate-fade-in">
+  // Render content based on active view
+  const renderContent = () => {
+    switch (activeView) {
+      case "procedures":
+        return (
+          <div className="space-y-6 animate-fade-in">
             <HospitalizationTasks
               nurseId={isPublic ? null : nurseId}
               todoTasks={todoTasks}
@@ -737,68 +613,133 @@ const NurseDashboard = () => {
               refreshing={isRefreshing || isPublic}
               onRefresh={refreshDashboardData}
             />
-          </TabsContent>
+          </div>
+        );
 
-          <TabsContent value="medicines" className="space-y-6 animate-fade-in">
+      case "medical-cards":
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <MedicalCardsForNurse />
+          </div>
+        );
+
+      case "nurse-care":
+        return (
+          <div className="space-y-6 animate-fade-in">
+            <NurseCareCardsManager />
+          </div>
+        );
+
+      case "medicines":
+        return (
+          <div className="space-y-6 animate-fade-in">
             <Card className="border-2 hover:shadow-glow transition-all">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Pill className="w-5 h-5 text-primary" />
-                  {t('nurse.medicines.title')}
-                </CardTitle>
-                <CardDescription>
-                  {t('nurse.medicines.description')}
-                </CardDescription>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Pill className="w-5 h-5 text-primary" />
+                      {t('nurse.medicines.title')}
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      {t('nurse.medicines.description')}
+                    </CardDescription>
+                  </div>
+                  <Badge variant="secondary" className="self-start sm:self-center">
+                    {t('nurse.medicines.total', { count: totalMedicinesCount })}
+                  </Badge>
+                </div>
+                {/* Search Input */}
+                <div className="relative mt-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={t('nurse.medicines.searchPlaceholder')}
+                    value={medicinesSearch}
+                    onChange={(e) => setMedicinesSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
-                {metricsLoading && preparedMedicines.length === 0 ? (
+                {metricsLoading && medicinesList.length === 0 ? (
                   <div className="flex items-center justify-center gap-3 py-8 text-muted-foreground">
                     <span className="inline-flex h-6 w-6 items-center justify-center">
                       <Loader2 className="h-6 w-6 animate-spin" />
                     </span>
                     {t('nurse.medicines.loading')}
                   </div>
-                ) : preparedMedicines.length === 0 ? (
+                ) : medicinesList.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <Pill className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p>{t('nurse.medicines.empty')}</p>
                   </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>{t('nurse.medicines.table.name')}</TableHead>
-                          <TableHead>{t('nurse.medicines.table.category')}</TableHead>
-                          <TableHead>{t('nurse.medicines.table.stock')}</TableHead>
-                          <TableHead>{t('nurse.medicines.table.updated')}</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {preparedMedicines.map((item) => (
-                          <TableRow key={`medicine-${item.id}`}>
-                            <TableCell className="font-medium">{item.name}</TableCell>
-                            <TableCell>{item.category}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={item.stock !== null && item.stock <= 0 ? "destructive" : "outline"}
-                                className={item.stock !== null && item.stock <= 0 ? "bg-destructive text-destructive-foreground" : ""}
-                              >
-                                {item.stock !== null ? `${item.stock}${item.unit ? ` ${item.unit}` : ""}` : "—"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{formatDate(item.updatedAt)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                ) : preparedMedicines.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>{t('nurse.medicines.noSearchResults')}</p>
+                    <Button
+                      variant="link"
+                      onClick={() => setMedicinesSearch("")}
+                      className="mt-2"
+                    >
+                      {t('nurse.medicines.clearSearch')}
+                    </Button>
                   </div>
+                ) : (
+                  <>
+                    {medicinesSearch && (
+                      <div className="mb-4 flex items-center justify-between text-sm text-muted-foreground">
+                        <span>
+                          {t('nurse.medicines.searchResults', { count: preparedMedicines.length, total: totalMedicinesCount })}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setMedicinesSearch("")}
+                        >
+                          {t('nurse.medicines.clearSearch')}
+                        </Button>
+                      </div>
+                    )}
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t('nurse.medicines.table.name')}</TableHead>
+                            <TableHead>{t('nurse.medicines.table.category')}</TableHead>
+                            <TableHead>{t('nurse.medicines.table.stock')}</TableHead>
+                            <TableHead>{t('nurse.medicines.table.updated')}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {preparedMedicines.map((item) => (
+                            <TableRow key={`medicine-${item.id}`}>
+                              <TableCell className="font-medium">{item.name}</TableCell>
+                              <TableCell>{item.category}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={item.stock !== null && item.stock <= 0 ? "destructive" : item.stock !== null && item.stock <= 10 ? "secondary" : "outline"}
+                                  className={item.stock !== null && item.stock <= 0 ? "bg-destructive text-destructive-foreground" : item.stock !== null && item.stock <= 10 ? "bg-amber-100 text-amber-800 border-amber-300" : ""}
+                                >
+                                  {item.stock !== null ? `${item.stock}${item.unit ? ` ${item.unit}` : ""}` : "—"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{formatDate(item.updatedAt)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
+        );
 
-          <TabsContent value="schedule" className="space-y-6 animate-fade-in">
+      case "schedule":
+        return (
+          <div className="space-y-6 animate-fade-in">
             <Card className="border-2 hover:shadow-glow transition-all">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -849,9 +790,12 @@ const NurseDashboard = () => {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
+        );
 
-          <TabsContent value="salary" className="space-y-6 animate-fade-in">
+      case "salary":
+        return (
+          <div className="space-y-6 animate-fade-in">
             <Card className="border-2 hover:shadow-glow transition-all">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -934,12 +878,142 @@ const NurseDashboard = () => {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
+        );
 
-          <TabsContent value="nurse-care" className="space-y-6 animate-fade-in">
-            <NurseCareCardsManager />
-          </TabsContent>
-        </Tabs>
+      case "main":
+      default:
+        return (
+          <div className="space-y-6 animate-fade-in">
+            {/* Welcome Banner */}
+            <Card className="overflow-hidden border-0 shadow-elegant">
+              <div className="bg-gradient-hero p-8 text-primary-foreground relative">
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnoiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4xIi8+PC9nPjwvc3ZnPg==')] opacity-20" />
+                <div className="relative flex items-center gap-4">
+                  <div className="p-2 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-white/40 flex items-center justify-center relative group">
+                      {me?.image ? (
+                        // eslint-disable-next-line jsx-a11y/alt-text
+                        <img src={me.image} alt="avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-10 h-10" />
+                      )}
+                      <label className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleBannerImageChange(e.target.files?.[0])} />
+                        <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/90 text-black px-3 py-1 rounded-full shadow">
+                          <ImageIcon className="w-4 h-4" /> {bannerUploading ? t('nurse.banner.uploading') : t('nurse.banner.changeImage')}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-bold mb-1">
+                      {t("dashboard.welcome")}, {me?.first_name ? `${me.first_name}` : t('nurse.banner.defaultName')}! 💉
+                    </h2>
+                    <p className="text-primary-foreground/90 text-lg">{t('nurse.banner.subtitle')}</p>
+                    <p className="text-primary-foreground/80 text-sm mt-1">
+                      {t('nurse.banner.dailySalaryLabel')} <span className="font-semibold">{formatCurrency(dailySalary)}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {showNurseWarning && (
+              <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+                {t('nurse.profileNotFound.inlineWarning')}
+              </div>
+            )}
+
+            {/* Metrics Section */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <h3 className="text-lg font-semibold text-muted-foreground">{t('nurse.metrics.title')}</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshDashboardData}
+                disabled={isRefreshing || !nurseId || isPublic}
+                className="gap-2"
+              >
+                <RefreshCcw className="w-4 h-4" />
+                {t('nurse.metrics.refresh')}
+              </Button>
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+              {statsConfig.map(({ key, label, value, formatter, icon: Icon, subtitle }) => (
+                <Card
+                  key={key}
+                  className="border-2 hover:shadow-glow transition-all bg-gradient-to-br from-emerald-50 via-background to-teal-50"
+                >
+                  <CardHeader className="pb-3 flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary text-base">
+                        <Icon className="w-4 h-4" />
+                      </span>
+                      {label}
+                    </CardTitle>
+                    <span className="text-lg">✨</span>
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-3xl font-bold bg-gradient-to-r from-primary to-emerald-600 bg-clip-text text-transparent ${
+                      isRefreshing ? "opacity-70" : ""
+                    }`}>
+                      {formatter(value)}
+                    </div>
+                    {subtitle && <p className="text-xs text-muted-foreground mt-2">{subtitle}</p>}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
+      {/* Sidebar Navigation */}
+      <Sidebar
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        activeView={activeView}
+        onNavigate={handleNavigate}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+        {/* Header */}
+        <header className="border-b bg-background/80 backdrop-blur-md sticky top-0 z-40 animate-fade-in">
+          <div className="px-4 md:px-6 py-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="flex items-center gap-3 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary transition hover:opacity-90 hover-scale"
+              aria-label={t('common.goHome')}
+            >
+              <img src={elvetLogo} alt="ELVET" className="w-10 h-10 md:w-12 md:h-12 rounded-xl object-cover shadow-glow border border-white/30" />
+              <div className="text-left hidden sm:block">
+                <h1 className="text-xl font-bold bg-gradient-hero bg-clip-text text-transparent">ELVET</h1>
+                <p className="text-xs text-muted-foreground">{t("dashboard.nurse")}</p>
+              </div>
+            </button>
+            <div className="flex items-center gap-2 md:gap-3">
+              <LanguageSwitcher />
+              <Button variant="outline" onClick={handleLogout} className="gap-2 hover-scale" size="sm">
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">{t("dashboard.logout")}</span>
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Scrollable Content */}
+        <main className="flex-1 overflow-auto">
+          <div className="p-4 md:p-6 lg:p-8">
+            {renderContent()}
+          </div>
+        </main>
       </div>
     </div>
   );

@@ -99,7 +99,7 @@ export const ru = {
   "contacts.form.firstNamePlaceholder": "Иван",
   "contacts.form.lastName": "Фамилия",
   "contacts.form.lastNamePlaceholder": "Иванов",
-  "contacts.form.message": "Сообщение (необязательно)",
+  "contacts.form.message": "Сообщение (обязательно)",
   "contacts.form.messagePlaceholder": "Напишите ваше сообщение или вопрос...",
   "contacts.form.messageHelper": "Минимум 5 символов, максимум 2000",
   "contacts.form.submit": "Отправить",
@@ -166,12 +166,24 @@ export const ru = {
   "doctor.newCard.title": "Новая медкарта",
   "doctor.newCard.subtitle": "Заполните информацию о питомце, диагноз, анализы, услуги и препараты",
   "doctor.sections.petAndExam": "Данные питомца и осмотра",
-  // Tabs (Doctor)
+  // Tabs (Doctor) - для обратной совместимости
   "doctor.tabs.clients": "Клиенты",
   "doctor.tabs.services": "Услуги",
   "doctor.tabs.medicines": "Препараты",
   "doctor.tabs.history": "История карт",
   "doctor.tabs.rooms": "Палаты",
+  // Навигация сайдбара доктора
+  "doctor.sidebar.navigation": "Навигация",
+  "doctor.sidebar.main": "Главная",
+  "doctor.sidebar.clients": "Клиенты",
+  "doctor.sidebar.services": "Услуги",
+  "doctor.sidebar.medicines": "Препараты",
+  "doctor.sidebar.history": "История карт",
+  "doctor.sidebar.rooms": "Палаты",
+  "doctor.sidebar.salary": "История зарплаты",
+  "doctor.sidebar.collapse": "Свернуть сайдбар",
+  "doctor.sidebar.expand": "Развернуть сайдбар",
+  "doctor.sidebar.hint": "Используйте сайдбар для навигации между разделами",
   "doctor.pet.selectLabel": "Питомец клиента",
   "doctor.pet.selectPlaceholder": "Выберите питомца",
   "doctor.pet.loading": "Загрузка питомцев…",
@@ -283,6 +295,7 @@ export const ru = {
   // Doctor card creation flow
   "doctor.create.validation.selectClient": "Выберите клиента",
   "doctor.create.validation.selectPet": "Выберите питомца",
+  "doctor.create.validation.selectNurse": "Выберите ответственную медсестру",
   "doctor.create.validation.diagnosis": "Укажите диагноз",
   "doctor.create.validation.requiredFieldsTitle": "Обязательные поля не заполнены",
   "doctor.create.validation.selectItems": "Добавьте хотя бы одну услугу, препарат или корм",
@@ -295,6 +308,10 @@ export const ru = {
   "doctor.create.idMissingDescription": "Сервер не вернул идентификатор медкарты",
   "doctor.create.successTitle": "Медкарта создана",
   "doctor.create.successDescription": "Карта №{{id}} успешно сохранена",
+  "doctor.create.nursesLoadError": "Не удалось загрузить медсестёр",
+  "doctor.create.assignedNurseLabel": "Ответственная медсестра",
+  "doctor.create.assignedNursePlaceholder": "Выберите медсестру",
+  "doctor.create.noNurses": "Нет доступных медсестёр",
   "doctor.create.pet.noClient": "Выберите клиента перед созданием питомца",
   "doctor.create.pet.nameRequired": "Укажите имя питомца",
   "doctor.create.pet.speciesRequired": "Выберите вид питомца",
@@ -618,7 +635,9 @@ export const ru = {
   "client.profile.phonePrimary": "Основной телефон",
   "client.profile.phoneSecondary": "Дополнительный телефон",
   "client.profile.phoneInvalid": "Неверный формат телефона",
-  "client.profile.phonesMustDiffer": "Номера должны отличаться",
+  "client.profile.phonesMustDiffer": "Номера телефонов должны отличаться",
+  "client.profile.error.duplicatePhone": "Дубликат номера телефона",
+  "client.profile.error.phoneAlreadyInUse": "Этот номер телефона ({{phone}}) уже используется другим аккаунтом",
   "client.profile.edit": "Редактировать профиль",
   "client.profile.toast.updateSuccess": "Профиль обновлён",
   "client.profile.toast.photoUpdateSuccess": "Фото обновлено",
@@ -667,6 +686,11 @@ export const ru = {
   "client.medicalCards.doctor.loading": "Доктор: загрузка...",
   "client.medicalCards.doctor.unknown": "Доктор: неизвестен",
   "client.medicalCards.doctor.prefix": "Dr.",
+  "client.medicalCards.assignedNurse": "Ответственная медсестра",
+  "client.medicalCards.assignedNurse.unknown": "Не назначена",
+  
+  // Nurse medical card view
+  "nurse.medicalCards.assignedNurse": "Ответственная медсестра",
   
   // Client dashboard banner/nav helpers
   "client.hero.fallbackRole": "Клиент",
@@ -685,6 +709,19 @@ export const ru = {
   "nurse.profileNotFound.title": "Профиль медсестры не найден",
   "nurse.profileNotFound.description": "Обратитесь к администратору для доступа",
   "nurse.profileNotFound.inlineWarning": "Не удалось определить ваш профиль медсестры. Обратитесь к администратору, чтобы продолжить работу с задачами.",
+
+  // Nurse sidebar navigation
+  "nurse.sidebar.navigation": "Навигация",
+  "nurse.sidebar.main": "Главная",
+  "nurse.sidebar.procedures": "Процедуры",
+  "nurse.sidebar.medicalCards": "Медицинские карты",
+  "nurse.sidebar.nurseCare": "Уход медсестры",
+  "nurse.sidebar.medicines": "Лекарства",
+  "nurse.sidebar.schedule": "Расписание",
+  "nurse.sidebar.salary": "История зарплаты",
+  "nurse.sidebar.collapse": "Свернуть боковую панель",
+  "nurse.sidebar.expand": "Развернуть боковую панель",
+  "nurse.sidebar.hint": "Используйте боковую панель для навигации",
 
   // Nurse metrics boxes
   "nurse.metrics.title": "Рабочие показатели",
@@ -706,9 +743,14 @@ export const ru = {
 
   // Nurse medicines tab
   "nurse.medicines.title": "Склад лекарств",
-  "nurse.medicines.description": "Контроль остатков и доступности препаратов по данным API",
+  "nurse.medicines.description": "Все лекарства в базе данных с текущими остатками",
   "nurse.medicines.loading": "Обновляем данные склада...",
   "nurse.medicines.empty": "Список лекарств пуст",
+  "nurse.medicines.total": "Всего: {{count}}",
+  "nurse.medicines.searchPlaceholder": "Поиск лекарств по названию или категории...",
+  "nurse.medicines.noSearchResults": "Лекарства не найдены по вашему запросу",
+  "nurse.medicines.clearSearch": "Очистить поиск",
+  "nurse.medicines.searchResults": "Показано {{count}} из {{total}} лекарств",
   "nurse.medicines.table.name": "Название",
   "nurse.medicines.table.category": "Категория",
   "nurse.medicines.table.stock": "Остаток",
@@ -914,8 +956,10 @@ export const ru = {
   "moderator.select.pet": "Выберите питомца",
 
   // Client dashboard - Nurse Care tab
-  "client.tabs.nurseCare": "Nurse Care",
-  "client.tabs.nurseCareShort": "Nurse",
+  "client.tabs.nurseCare": "Карточки ухода",
+  "client.tabs.nurseCareShort": "Карточки",
+  "client.tabs.historyCards": "Карты истории",
+  "client.tabs.historyCardsShort": "История",
 
   // Nurse dashboard - Nurse Care tab
   "nurse.tabs.nurseCare": "Nurse Care 💗",
@@ -955,7 +999,7 @@ export const ru = {
   "client.medicalCards.attachments.openFile": "Открыть",
 
   // Client NurseCareCardsViewer
-  "client.nurseCare.title": "Карты ухода медсестры",
+  "client.nurseCare.title": "Карточки ухода",
   "client.nurseCare.subtitle": "Просмотр истории ухода медсестры",
   "client.nurseCare.loading": "Загрузка…",
   "client.nurseCare.error": "Не удалось загрузить",
@@ -972,6 +1016,23 @@ export const ru = {
   "client.nurseCare.total": "Всего:",
   "client.nurseCare.paid": "Оплачено:",
   "client.nurseCare.remain": "Остаток:",
+
+  // Client HistoryCardsViewer (unified medical + nurse cards)
+  "client.historyCards.title": "Карты истории",
+  "client.historyCards.subtitle": "Все медицинские и карты ухода в одном месте",
+  "client.historyCards.filterByStatus": "Фильтр по статусу оплаты",
+  "client.historyCards.status.waiting": "Ожидает оплаты",
+  "client.historyCards.status.waitingShort": "Ожидает",
+  "client.historyCards.status.partlyPaid": "Частично оплачено",
+  "client.historyCards.status.partlyPaidShort": "Частично",
+  "client.historyCards.status.fullyPaid": "Полностью оплачено",
+  "client.historyCards.status.fullyPaidShort": "Оплачено",
+  "client.historyCards.badge.medical": "Медицинская",
+  "client.historyCards.badge.medicalShort": "Мед",
+  "client.historyCards.badge.nurseCare": "Уход",
+  "client.historyCards.badge.nurseCareShort": "Уход",
+  "client.historyCards.empty": "Карты не найдены",
+  "client.historyCards.emptyHint": "Попробуйте выбрать другой статус оплаты",
 
   // Moderator NurseCareCardsManager
   "moderator.nurseCare.title": "Карты ухода медсестры",

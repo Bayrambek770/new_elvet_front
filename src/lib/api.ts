@@ -258,6 +258,14 @@ export const Tasks = {
   update: <T = unknown>(id: ID, body: Record<string, unknown>) => put<T>("tasks/", id, body),
   patch: <T = unknown>(id: ID, body: Record<string, unknown>) => patch<T>("tasks/", id, body),
   remove: (id: ID) => del("tasks/", id),
+  
+  // Nurse-specific task endpoints (optional - may use payment-transactions paths per API guide)
+  getToDoByNurseId: async <T = any>(nurseId: ID) => 
+    (await api.get<T>(`payment-transactions/to-do/by_id/${nurseId}/`)).data,
+  getDoneByNurseId: async <T = any>(nurseId: ID) => 
+    (await api.get<T>(`payment-transactions/done/by_id/${nurseId}/`)).data,
+  getDoneTodayByNurseId: async <T = any>(nurseId: ID) => 
+    (await api.get<T>(`payment-transactions/done/today/by_id/${nurseId}/`)).data,
 };
 
 // Payments (read-only)
@@ -270,11 +278,35 @@ export const Payments = {
   yearly: <T = any>() => (api.get<T>("payments/yearly/").then((r) => r.data)),
 };
 
-// Salary history by user (doctor) id
-export const SalaryHistory = {
-  weekly: async <T = any>(id: ID) => (await api.get<T>(`salary/history/${id}/weekly/`)).data,
-  monthly: async <T = any>(id: ID) => (await api.get<T>(`salary/history/${id}/monthly/`)).data,
+// Salary API - includes staff summary for moderators and individual history
+export type StaffSalarySummary = {
+  date: string;
+  staff_salaries: Array<{
+    user_id: number;
+    name: string;
+    role: "DOCTOR" | "NURSE" | string;
+    amount: string;
+  }>;
 };
+
+export const Salary = {
+  // Moderators/Admins only - daily summary of all staff salaries
+  dailyStaffSummary: async <T = StaffSalarySummary>() => 
+    (await api.get<T>("salary/daily/staff-summary/")).data,
+  
+  // Individual salary history (user can view their own, moderators/admins can view anyone's)
+  history: {
+    daily: async <T = any>(userId: ID) => 
+      (await api.get<T>(`salary/history/${userId}/daily/`)).data,
+    weekly: async <T = any>(userId: ID) => 
+      (await api.get<T>(`salary/history/${userId}/weekly/`)).data,
+    monthly: async <T = any>(userId: ID) => 
+      (await api.get<T>(`salary/history/${userId}/monthly/`)).data,
+  },
+};
+
+// Legacy export for backward compatibility
+export const SalaryHistory = Salary.history;
 
 // /me endpoint
 export type ClientProfile = {

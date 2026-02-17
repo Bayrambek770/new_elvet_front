@@ -37,4 +37,23 @@ if (typeof window !== "undefined") {
   };
 }
 
+// Wait for CSS to load before revealing content
+if (typeof window !== "undefined") {
+  // Mark root as loaded after CSS and fonts are ready
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => {
+      requestAnimationFrame(() => {
+        document.getElementById("root")?.classList.add("loaded");
+      });
+    });
+  } else {
+    // Fallback for browsers without font loading API
+    window.addEventListener("load", () => {
+      requestAnimationFrame(() => {
+        document.getElementById("root")?.classList.add("loaded");
+      });
+    });
+  }
+}
+
 createRoot(document.getElementById("root")!).render(<App />);

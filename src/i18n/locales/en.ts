@@ -166,12 +166,24 @@ export const en = {
   "doctor.newCard.title": "New medical card",
   "doctor.newCard.subtitle": "Fill pet info, diagnosis, analyses, services and medicines",
   "doctor.sections.petAndExam": "Pet and examination",
-  // Tabs (Doctor)
+  // Tabs (Doctor) - kept for backward compatibility
   "doctor.tabs.clients": "Clients",
   "doctor.tabs.services": "Services",
   "doctor.tabs.medicines": "Medicines",
   "doctor.tabs.history": "History",
   "doctor.tabs.rooms": "Rooms",
+  // Doctor sidebar navigation
+  "doctor.sidebar.navigation": "Navigation",
+  "doctor.sidebar.main": "Main",
+  "doctor.sidebar.clients": "Clients",
+  "doctor.sidebar.services": "Services",
+  "doctor.sidebar.medicines": "Medicines",
+  "doctor.sidebar.history": "History",
+  "doctor.sidebar.rooms": "Rooms",
+  "doctor.sidebar.salary": "Salary History",
+  "doctor.sidebar.collapse": "Collapse sidebar",
+  "doctor.sidebar.expand": "Expand sidebar",
+  "doctor.sidebar.hint": "Use sidebar to navigate between sections",
   "doctor.pet.selectLabel": "Client's pet",
   "doctor.pet.selectPlaceholder": "Select a pet",
   "doctor.pet.loading": "Loading pets…",
@@ -283,6 +295,7 @@ export const en = {
   // Doctor card creation flow
   "doctor.create.validation.selectClient": "Select a client",
   "doctor.create.validation.selectPet": "Select a pet",
+  "doctor.create.validation.selectNurse": "Select an assigned nurse",
   "doctor.create.validation.diagnosis": "Enter diagnosis",
   "doctor.create.validation.requiredFieldsTitle": "Missing required fields",
   "doctor.create.validation.selectItems": "Add at least one service, medicine or feed",
@@ -295,6 +308,10 @@ export const en = {
   "doctor.create.idMissingDescription": "Server did not return card ID",
   "doctor.create.successTitle": "Medical card created",
   "doctor.create.successDescription": "Card #{{id}} saved successfully",
+  "doctor.create.nursesLoadError": "Failed to load nurses",
+  "doctor.create.assignedNurseLabel": "Assigned Nurse",
+  "doctor.create.assignedNursePlaceholder": "Select nurse to assign",
+  "doctor.create.noNurses": "No nurses available",
   "doctor.create.pet.noClient": "Select a client before creating a pet",
   "doctor.create.pet.nameRequired": "Enter pet name",
   "doctor.create.pet.speciesRequired": "Select pet species",
@@ -619,6 +636,8 @@ export const en = {
   "client.profile.phoneSecondary": "Additional phone",
   "client.profile.phoneInvalid": "Invalid phone format",
   "client.profile.phonesMustDiffer": "Phone numbers must differ",
+  "client.profile.error.duplicatePhone": "Duplicate Phone Number",
+  "client.profile.error.phoneAlreadyInUse": "This phone number ({{phone}}) is already in use by another account",
   "client.profile.edit": "Edit profile",
   "client.profile.toast.updateSuccess": "Profile updated",
   "client.profile.toast.photoUpdateSuccess": "Photo updated",
@@ -667,6 +686,11 @@ export const en = {
   "client.medicalCards.doctor.loading": "Doctor: loading...",
   "client.medicalCards.doctor.unknown": "Doctor: unknown",
   "client.medicalCards.doctor.prefix": "Dr.",
+  "client.medicalCards.assignedNurse": "Assigned Nurse",
+  "client.medicalCards.assignedNurse.unknown": "Not assigned",
+  
+  // Nurse medical card view
+  "nurse.medicalCards.assignedNurse": "Assigned Nurse",
   
   // Client dashboard banner/nav helpers
   "client.hero.fallbackRole": "Client",
@@ -685,6 +709,19 @@ export const en = {
   "nurse.profileNotFound.title": "Nurse profile not found",
   "nurse.profileNotFound.description": "Contact the administrator for access",
   "nurse.profileNotFound.inlineWarning": "Could not determine your nurse profile. Contact the administrator to continue working with tasks.",
+
+  // Nurse sidebar navigation
+  "nurse.sidebar.navigation": "Navigation",
+  "nurse.sidebar.main": "Main",
+  "nurse.sidebar.procedures": "Procedures",
+  "nurse.sidebar.medicalCards": "Medical Cards",
+  "nurse.sidebar.nurseCare": "Nurse Care",
+  "nurse.sidebar.medicines": "Medicines",
+  "nurse.sidebar.schedule": "Schedule",
+  "nurse.sidebar.salary": "Salary History",
+  "nurse.sidebar.collapse": "Collapse sidebar",
+  "nurse.sidebar.expand": "Expand sidebar",
+  "nurse.sidebar.hint": "Use sidebar to navigate between sections",
 
   // Nurse metrics boxes
   "nurse.metrics.title": "Work metrics",
@@ -706,9 +743,14 @@ export const en = {
 
   // Nurse medicines tab
   "nurse.medicines.title": "Medicines stock",
-  "nurse.medicines.description": "Control of balances and availability via API",
+  "nurse.medicines.description": "All medicines in database with current stock levels",
   "nurse.medicines.loading": "Updating stock data...",
   "nurse.medicines.empty": "Medicine list is empty",
+  "nurse.medicines.total": "Total: {{count}}",
+  "nurse.medicines.searchPlaceholder": "Search medicines by name or category...",
+  "nurse.medicines.noSearchResults": "No medicines found matching your search",
+  "nurse.medicines.clearSearch": "Clear search",
+  "nurse.medicines.searchResults": "Showing {{count}} of {{total}} medicines",
   "nurse.medicines.table.name": "Name",
   "nurse.medicines.table.category": "Category",
   "nurse.medicines.table.stock": "Stock",
@@ -912,8 +954,10 @@ export const en = {
   "moderator.select.pet": "Select pet",
 
   // Client dashboard - Nurse Care tab
-  "client.tabs.nurseCare": "Nurse Care",
-  "client.tabs.nurseCareShort": "Nurse",
+  "client.tabs.nurseCare": "Nurse Cards",
+  "client.tabs.nurseCareShort": "Cards",
+  "client.tabs.historyCards": "History Cards",
+  "client.tabs.historyCardsShort": "History",
 
   // Nurse dashboard - Nurse Care tab
   "nurse.tabs.nurseCare": "Nurse Care 💗",
@@ -953,7 +997,7 @@ export const en = {
   "client.medicalCards.attachments.openFile": "Open",
 
   // Client NurseCareCardsViewer
-  "client.nurseCare.title": "Nurse Care Cards",
+  "client.nurseCare.title": "Nurse Cards",
   "client.nurseCare.subtitle": "Read-only view of your nurse care history",
   "client.nurseCare.loading": "Loading…",
   "client.nurseCare.error": "Failed to load",
@@ -970,6 +1014,23 @@ export const en = {
   "client.nurseCare.total": "Total:",
   "client.nurseCare.paid": "Paid:",
   "client.nurseCare.remain": "Remain:",
+
+  // Client HistoryCardsViewer (unified medical + nurse cards)
+  "client.historyCards.title": "History Cards",
+  "client.historyCards.subtitle": "All medical and nurse care records in one place",
+  "client.historyCards.filterByStatus": "Filter by payment status",
+  "client.historyCards.status.waiting": "Waiting for Payment",
+  "client.historyCards.status.waitingShort": "Waiting",
+  "client.historyCards.status.partlyPaid": "Partly Paid",
+  "client.historyCards.status.partlyPaidShort": "Partly",
+  "client.historyCards.status.fullyPaid": "Fully Paid",
+  "client.historyCards.status.fullyPaidShort": "Paid",
+  "client.historyCards.badge.medical": "Medical",
+  "client.historyCards.badge.medicalShort": "Med",
+  "client.historyCards.badge.nurseCare": "Nurse Care",
+  "client.historyCards.badge.nurseCareShort": "Nurse",
+  "client.historyCards.empty": "No cards found",
+  "client.historyCards.emptyHint": "Try selecting a different payment status",
 
   // Moderator NurseCareCardsManager
   "moderator.nurseCare.title": "Nurse Care Cards",

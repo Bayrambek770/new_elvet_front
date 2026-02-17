@@ -28,6 +28,7 @@ import { MedicalCards, Medicines, Services, Pets, Visits, Requests as RequestsAp
 import { FeedSalesManager } from "@/components/moderator/FeedSalesManager";
 import FeedInventory from "@/components/moderator/FeedInventory";
 import { ModeratorNurseCareCardsManager } from "@/components/moderator/NurseCareCardsManager";
+import { StaffSalaryDashboard } from "@/components/moderator/StaffSalaryDashboard";
 import elvetLogo from "@/assets/elvet_logo.jpg";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -867,6 +868,10 @@ const ModeratorDashboard = () => {
 
           <TabsContent value="nurseCare" className="space-y-6 animate-fade-in">
             <ModeratorNurseCareCardsManager />
+          </TabsContent>
+
+          <TabsContent value="staff-salaries" className="space-y-6 animate-fade-in">
+            <StaffSalaryDashboard />
           </TabsContent>
 
           <TabsContent value="feedSales" className="space-y-6 animate-fade-in">

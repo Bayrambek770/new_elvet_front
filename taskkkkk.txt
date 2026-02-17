@@ -1,0 +1,167 @@
+Nurse Dashboard Redesign - Implementation Plan
+Design Reasoning & User Experience
+Current Problems
+Horizontal tabs take up vertical space - In a dashboard with lots of data, vertical space is precious
+Tab overflow on mobile - 6 tabs don't fit well on smaller screens
+No clear visual hierarchy - All tabs appear equally important
+Limited scalability - Hard to add more sections without cluttering
+Proposed Solution: Collapsible Sidebar Navigation
+Why a Sidebar?
+✅ Saves vertical space - Metrics and content get full height
+✅ Modern UX pattern - Users expect sidebars in admin/dashboard apps (like Gmail, Slack, etc.)
+✅ Better mobile experience - Can fully hide on small screens, giving content 100% width
+✅ Scalable - Easy to add/remove navigation items
+✅ Clear hierarchy - "Main" is the home/default view
+Auto-hide Behavior
+The sidebar will:
+
+Start collapsed on page load (showing only icons)
+Expand on hover (desktop) or toggle button (all devices)
+Remember state using localStorage
+Auto-collapse on mobile after selection to maximize content space
+Navigation Structure
+Sidebar Items (in order)
+Icon	Label	Route/View	Description
+🏠	Main	/dashboard/nurse	Dashboard overview with metrics
+📋	Medical Cards	?view=medical-cards	View and manage medical cards
+🔄	Second Visit	?view=second-visit	Repeat appointments (повторный прием)
+💊	Medicines	?view=medicines	Medicine inventory management
+Implementation Notes
+Use query parameters (?view=) instead of routes to keep single-page experience
+Main view shows the dashboard metrics (Daily rate, Tasks, Completed today, Medicines in stock)
+Other views replace the main content area while keeping header and sidebar
+Technical Architecture
+Component Structure
+<NurseDashboard>
+  <Header> (stays on top, unchanged)
+  <div className="flex">
+    <Sidebar> (NEW - collapsible)
+      <SidebarItem active={view === 'main'}>Main</SidebarItem>
+      <SidebarItem active={view === 'medical-cards'}>Medical Cards</SidebarItem>
+      <SidebarItem active={view === 'second-visit'}>Second Visit</SidebarItem>
+      <SidebarItem active={view === 'medicines'}>Medicines</SidebarItem>
+    </Sidebar>
+    
+    <MainContent> (flexible width based on sidebar state)
+      {view === 'main' && <DashboardMetrics />}
+      {view === 'medical-cards' && <MedicalCardsForNurse />}
+      {view === 'second-visit' && <SecondVisitView />}
+      {view === 'medicines' && <MedicinesInventory />}
+    </MainContent>
+  </div>
+</NurseDashboard>
+State Management
+const [sidebarOpen, setSidebarOpen] = useState(() => {
+  return localStorage.getItem('nurseSidebarOpen') === 'true';
+});
+const [activeView, setActiveView] = useState<'main' | 'medical-cards' | 'second-visit' | 'medicines'>(() => {
+  const params = new URLSearchParams(location.search);
+  return params.get('view') || 'main';
+});
+Proposed Changes
+[NEW] src/components/nurse/Sidebar.tsx
+Create a reusable sidebar component with:
+
+Collapse/expand animation
+Icon-only mode when collapsed
+Tooltip on hover (when collapsed)
+Active state highlighting
+Mobile-responsive hamburger menu
+Key Features:
+
+Width: 256px (expanded), 64px (collapsed)
+Smooth transition: transition-all duration-300 ease-in-out
+Background: Gradient or solid with subtle border
+Icons from lucide-react: Home, FileText, RefreshCw, Pill
+[MODIFY] 
+src/pages/dashboard/NurseDashboard.tsx
+Changes:
+
+Remove <Tabs> and <TabsContent> components
+Add sidebar navigation
+Use query parameter routing for views
+Keep metrics on "Main" view only
+Move existing tab content to separate views
+Layout:
+
+<div className="flex min-h-screen">
+  <Sidebar 
+    isOpen={sidebarOpen}
+    onToggle={() => setSidebarOpen(!sidebarOpen)}
+    activeView={activeView}
+    onNavigate={(view) => {
+      setActiveView(view);
+      navigate(`?view=${view}`);
+    }}
+  />
+  
+  <div className="flex-1 overflow-auto">
+    <Header />
+    <MainContent view={activeView} />
+  </div>
+</div>
+[NEW] Translation Keys
+Add to en.ts, ru.ts, uz.ts:
+
+nurse: {
+  sidebar: {
+    main: 'Main',
+    medicalCards: 'Medical Cards',
+    secondVisit: 'Second Visit',
+    medicines: 'Medicines',
+    collapse: 'Collapse sidebar',
+    expand: 'Expand sidebar',
+  }
+}
+Visual Design Specs
+Sidebar Styling
+Collapsed width: 64px (icon-only)
+Expanded width: 256px
+Background: Gradient from emerald-50 to teal-50 (matching current theme)
+Active item: Primary gradient background with white text
+Hover: Subtle background highlight
+Border: Right border with border-primary/10
+Animations
+Sidebar toggle: transition-all duration-300 ease-in-out
+Item hover: scale(1.02) with smooth transition
+Icon rotation (collapse button): transform rotate-180
+Responsive Breakpoints
+Desktop (≥1024px): Sidebar defaults to expanded, can toggle
+Tablet (768-1023px): Sidebar defaults to collapsed, can toggle
+Mobile (<768px): Sidebar as overlay drawer, auto-closes after navigation
+Migration Strategy
+Phase 1: Sidebar Component
+Create Sidebar.tsx component
+Add basic structure and styling
+Implement collapse/expand logic
+Phase 2: Layout Integration
+Update 
+NurseDashboard.tsx
+ layout
+Remove old <Tabs> components
+Implement view routing with query parameters
+Phase 3: Content Views
+Keep "Main" view with metrics
+Move "Medical Cards" tab content to new view
+Create "Second Visit" view (new feature)
+Move "Medicines" tab content to new view
+Phase 4: Polish
+Add animations and transitions
+Add responsive behavior
+Add localStorage persistence
+Add keyboard navigation (arrow keys, Esc to close)
+Verification Plan
+Manual Testing
+ Sidebar toggles smoothly
+ Navigation switches views correctly
+ Active state highlights correct item
+ Sidebar state persists on page reload
+ Mobile overlay works on small screens
+ All translations display correctly
+ Keyboard navigation works
+Visual Testing
+ Sidebar aligns properly with header
+ Content area adjusts width dynamically
+ No layout shift during toggle
+ Icons and labels align properly
+ Hover states work correctly

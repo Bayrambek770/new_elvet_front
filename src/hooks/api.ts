@@ -15,12 +15,20 @@ import {
 } from "@/lib/api";
 import { api, tokenStore } from "@/lib/apiClient";
 
-export const useLogin = () =>
-  useMutation({
+export const useLogin = () => {
+  const qc = useQueryClient();
+  return useMutation({
     mutationFn: async (payload: { phone_number: string; password: string }) => {
       return await Auth.login(payload);
     },
+    onSuccess: () => {
+      // Invalidate and clear all queries on login to prevent stale data from previous user
+      qc.clear();
+      // Specifically invalidate the "me" query to force refetch
+      qc.invalidateQueries({ queryKey: ["me"] });
+    },
   });
+};
 
 export const useClients = () =>
   useQuery({
@@ -91,8 +99,8 @@ export const useMe = () => {
       return failureCount < 3;
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff: 1s, 2s, 4s, max 5s
-    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
-    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (formerly cacheTime)
+    staleTime: 0, // Always consider data stale - refetch on mount to ensure fresh data after login
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes (reduced from 10)
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     refetchOnMount: true,

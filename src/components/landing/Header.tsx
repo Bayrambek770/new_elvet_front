@@ -40,9 +40,12 @@ const Header = () => {
   };
 
   const scrollToSection = (href: string) => {
-    const element = document.querySelector(href);
-    element?.scrollIntoView({ behavior: "smooth" });
-    setIsMenuOpen(false);
+    // Defer to next frame to avoid forced layout before CSS loads
+    requestAnimationFrame(() => {
+      const element = document.querySelector(href);
+      element?.scrollIntoView({ behavior: "smooth" });
+      setIsMenuOpen(false);
+    });
   };
 
   return (

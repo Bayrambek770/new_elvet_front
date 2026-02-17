@@ -80,9 +80,86 @@ export const ProfileEditor = ({ user }: { user: MeResponse }) => {
       }));
       await qc.invalidateQueries({ queryKey: ["me"] });
       setEditing(false);
-  toast({ title: t("client.profile.toast.updateSuccess") });
+      toast({ 
+        title: t("client.profile.toast.updateSuccess"),
+        duration: 3000, // Auto-dismiss after 3 seconds
+      });
     } catch (error: any) {
-  toast({ title: t("auth.error"), description: error.message, variant: "destructive" });
+      // Parse error to show specific messages
+      let errorMessage = error.message || t("auth.error");
+      let errorTitle = t("auth.error");
+      
+      // Check if it's a duplicate phone number error
+      if (error?.response?.data) {
+        const errorData = error.response.data;
+        
+        // Backend may return errors in different formats:
+        // 1. Direct: { extra_number1: "message" }
+        // 2. Nested: { errors: { extra_number1: "message" } }
+        const errorsObj = errorData.errors || errorData;
+        
+        // Check for duplicate phone in extra_number1
+        if (errorsObj.extra_number1) {
+          const msg = Array.isArray(errorsObj.extra_number1) 
+            ? errorsObj.extra_number1[0] 
+            : errorsObj.extra_number1;
+          
+          if (typeof msg === 'string' && (
+            msg.toLowerCase().includes('already') || 
+            msg.toLowerCase().includes('in use') ||
+            msg.toLowerCase().includes('exist') ||
+            msg.toLowerCase().includes('duplicate') ||
+            msg.toLowerCase().includes('использует') ||
+            msg.toLowerCase().includes('mavjud')
+          )) {
+            errorTitle = t("client.profile.error.duplicatePhone");
+            errorMessage = t("client.profile.error.phoneAlreadyInUse", { phone: formData.extra_number1 });
+          } else {
+            errorMessage = msg;
+          }
+        }
+        
+        // Check for duplicate phone in extra_number2
+        if (errorsObj.extra_number2) {
+          const msg = Array.isArray(errorsObj.extra_number2) 
+            ? errorsObj.extra_number2[0] 
+            : errorsObj.extra_number2;
+          
+          if (typeof msg === 'string' && (
+            msg.toLowerCase().includes('already') || 
+            msg.toLowerCase().includes('in use') ||
+            msg.toLowerCase().includes('exist') ||
+            msg.toLowerCase().includes('duplicate') ||
+            msg.toLowerCase().includes('использует') ||
+            msg.toLowerCase().includes('mavjud')
+          )) {
+            errorTitle = t("client.profile.error.duplicatePhone");
+            errorMessage = t("client.profile.error.phoneAlreadyInUse", { phone: formData.extra_number2 });
+          } else {
+            errorMessage = msg;
+          }
+        }
+        
+        // Check for general non_field_errors
+        if (errorsObj.non_field_errors) {
+          const msg = Array.isArray(errorsObj.non_field_errors) 
+            ? errorsObj.non_field_errors[0] 
+            : errorsObj.non_field_errors;
+          errorMessage = msg;
+        }
+        
+        // Check for detail field
+        if (errorData.detail && typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail;
+        }
+      }
+      
+      toast({ 
+        title: errorTitle,
+        description: errorMessage, 
+        variant: "destructive",
+        duration: 5000, // Auto-dismiss after 5 seconds
+      });
     } finally {
       setLoading(false);
     }
@@ -100,9 +177,29 @@ export const ProfileEditor = ({ user }: { user: MeResponse }) => {
       if (data?.image) setImageUrl(data.image as string);
       qc.setQueryData(["me"], (prev: any) => ({ ...(prev || {}), image: data?.image ?? prev?.image ?? null }));
       await qc.invalidateQueries({ queryKey: ["me"] });
-  toast({ title: t("client.profile.toast.photoUpdateSuccess") });
+      toast({ 
+        title: t("client.profile.toast.photoUpdateSuccess"),
+        duration: 3000, // Auto-dismiss after 3 seconds
+      });
     } catch (error: any) {
-  toast({ title: t("auth.error"), description: error.message, variant: "destructive" });
+      let errorMessage = error.message || t("auth.error");
+      
+      // Better error parsing for avatar upload
+      if (error?.response?.data) {
+        const errorData = error.response.data;
+        if (errorData.image) {
+          errorMessage = Array.isArray(errorData.image) ? errorData.image[0] : errorData.image;
+        } else if (errorData.detail) {
+          errorMessage = errorData.detail;
+        }
+      }
+      
+      toast({ 
+        title: t("auth.error"), 
+        description: errorMessage, 
+        variant: "destructive",
+        duration: 5000,
+      });
     } finally {
       setAvatarUploading(false);
     }
