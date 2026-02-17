@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { tokenStore, api } from "@/lib/apiClient";
 import { useMe } from "@/hooks/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Heart, LogOut, User, Image as ImageIcon, Loader2, ExternalLink, Eye, EyeOff } from "lucide-react";
 import cashImg from "@/assets/Cash.png";
 import cardImg from "@/assets/Card.png";
@@ -29,12 +28,15 @@ import { FeedSalesManager } from "@/components/moderator/FeedSalesManager";
 import FeedInventory from "@/components/moderator/FeedInventory";
 import { ModeratorNurseCareCardsManager } from "@/components/moderator/NurseCareCardsManager";
 import { StaffSalaryDashboard } from "@/components/moderator/StaffSalaryDashboard";
+import { ModeratorSidebar, type ModeratorSidebarView } from "@/components/moderator/ModeratorSidebar";
 import elvetLogo from "@/assets/elvet_logo.jpg";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SearchableCombobox, type ComboboxItem } from "@/components/ui/SearchableCombobox";
 
 const ModeratorDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isPublic = new URLSearchParams(location.search).get("public") === "1";
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -43,6 +45,20 @@ const ModeratorDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [bannerUploading, setBannerUploading] = useState(false);
   const [kpis, setKpis] = useState({ medicinesAvailable: 0, servicesCount: 0, visitsCount: 0 });
+
+  // Sidebar state
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try { return localStorage.getItem("moderatorSidebarOpen") !== "false"; } catch { return true; }
+  });
+  const activeView = (searchParams.get("view") as ModeratorSidebarView) || "main";
+
+  const handleNavigate = (view: ModeratorSidebarView) => {
+    setSearchParams({ view });
+  };
+
+  useEffect(() => {
+    try { localStorage.setItem("moderatorSidebarOpen", String(sidebarOpen)); } catch {}
+  }, [sidebarOpen]);
 
   // Medical cards (waiting for payment)
   const [waitingLoading, setWaitingLoading] = useState(false);
@@ -72,20 +88,22 @@ const ModeratorDashboard = () => {
   const [visitsPage, setVisitsPage] = useState<{ count?: number; next?: string | null; previous?: string | null; results: any[] }>({ results: [] });
 
   // Visit creation state
-  const [visitClientId, setVisitClientId] = useState<string>("");
-  const [visitDoctorId, setVisitDoctorId] = useState<string>("");
-  const [visitPetId, setVisitPetId] = useState<string>("");
+  const [visitClientId, setVisitClientId] = useState<string | null>(null);
+  const [visitDoctorId, setVisitDoctorId] = useState<string | null>(null);
+  const [visitPetId, setVisitPetId] = useState<string | null>(null);
   const [visitCreating, setVisitCreating] = useState(false);
   const [clientsList, setClientsList] = useState<any[]>([]);
   const [doctorsList, setDoctorsList] = useState<any[]>([]);
   const [petsList, setPetsList] = useState<any[]>([]);
   const [listsLoading, setListsLoading] = useState(false);
+  // Client combobox search for visit form
+  const [visitClientSearchQuery, setVisitClientSearchQuery] = useState("");
+  const [visitClientItems, setVisitClientItems] = useState<ComboboxItem[]>([]);
+  const [visitClientSearchLoading, setVisitClientSearchLoading] = useState(false);
   // Name caches for visits rendering
   const [clientNames, setClientNames] = useState<Record<string | number, string>>({});
   const [doctorNames, setDoctorNames] = useState<Record<string | number, string>>({});
   const [petNames, setPetNames] = useState<Record<string | number, string>>({});
-
-  // Password reset removed per requirement (no longer used)
 
   // Requests inbox (simplified listing)
   const [rqLoading, setRqLoading] = useState(false);
@@ -99,7 +117,6 @@ const ModeratorDashboard = () => {
   // Retry fetching user profile if it fails
   useEffect(() => {
     if (meError && !meLoading) {
-      // Retry after a short delay
       const timer = setTimeout(() => {
         refetchMe();
       }, 2000);
@@ -112,7 +129,6 @@ const ModeratorDashboard = () => {
       const [meds, serv, visits] = await Promise.all([
         Medicines.availableCount<{ count: number }>(),
         Services.count<{ count: number }>(),
-        // Visits list used to derive total count (fallback to array length if not paginated)
         Visits.list<{ count?: number; results?: any[] }>().catch(() => ({ count: 0 })),
       ]);
       const visitsCount = (visits as any)?.count ?? (Array.isArray(visits) ? (visits as any).length : (visits as any)?.results?.length ?? 0);
@@ -125,7 +141,6 @@ const ModeratorDashboard = () => {
   const loadWaitingCards = async () => {
     setWaitingLoading(true);
     try {
-      // Try request with filters first (if backend supports); fallback to client-side filtering
       const data = await MedicalCards.list<any>({ payment_confirmed: false, is_paid: false, status: "WAITING_FOR_PAYMENT" } as any).catch(async () => await MedicalCards.list<any>());
       const arr = Array.isArray(data) ? data : (data as any)?.results || [];
       const filtered = arr.filter((c: any) => {
@@ -134,7 +149,6 @@ const ModeratorDashboard = () => {
         return !paid || status.includes("WAITING") || status.includes("ОЖИДАЕТ");
       });
       setWaitingCards(filtered);
-      // Also load partly-paid cards (best-effort)
       try {
         const partly = await MedicalCards.partlyPaid<any>();
         const pArr = Array.isArray(partly) ? partly : (partly as any)?.results || [];
@@ -220,7 +234,7 @@ const ModeratorDashboard = () => {
     void handleSearchVisits();
   }, []);
 
-  // Auto-load clients once on mount so the list is ready when the tab is opened
+  // Auto-load clients once on mount so the list is ready when the view is opened
   useEffect(() => {
     void handleLoadClients();
   }, []);
@@ -243,51 +257,23 @@ const ModeratorDashboard = () => {
 
       const data = await Clients.list<{ count?: number; next?: string | null; previous?: string | null; results?: any[] }>(params as any);
 
-      // Normalize to array
       const rawResults: any[] = Array.isArray(data) ? (data as any[]) : ((data as any)?.results || []);
 
-      // Apply strict client-side filtering so wrong input always hides rows
       const idQuery = clientFilterId.trim();
       const nameQuery = clientFilterName.trim().toLowerCase();
       const phoneQuery = clientFilterPhone.trim().toLowerCase();
 
       const filteredResults = rawResults.filter((c: any) => {
         const idStr = c?.id != null ? String(c.id) : "";
-        const nameStr = [
-          c?.full_name,
-          c?.name,
-          c?.username,
-          c?.first_name,
-          c?.last_name,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        const phoneStr = [
-          c?.phone_number,
-          c?.phone,
-          c?.extra_number1,
-          c?.extra_number2,
-          c?.profile?.extra_number1,
-          c?.profile?.extra_number2,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-
+        const nameStr = [c?.full_name, c?.name, c?.username, c?.first_name, c?.last_name].filter(Boolean).join(" ").toLowerCase();
+        const phoneStr = [c?.phone_number, c?.phone, c?.extra_number1, c?.extra_number2, c?.profile?.extra_number1, c?.profile?.extra_number2].filter(Boolean).join(" ").toLowerCase();
         const idOk = idQuery ? idStr.includes(idQuery) : true;
         const nameOk = nameQuery ? nameStr.includes(nameQuery) : true;
         const phoneOk = phoneQuery ? phoneStr.includes(phoneQuery) : true;
-
         return idOk && nameOk && phoneOk;
       });
 
-      setClientsPage({
-        count: filteredResults.length,
-        next: null,
-        previous: null,
-        results: filteredResults,
-      });
+      setClientsPage({ count: filteredResults.length, next: null, previous: null, results: filteredResults });
     } catch (e: any) {
       toast({ variant: "destructive", title: t("common.error"), description: e?.message || t("moderator.errors.loadClients") });
     } finally {
@@ -299,14 +285,8 @@ const ModeratorDashboard = () => {
     if (!url) return;
     setClientsLoading(true);
     try {
-      // Preserve current search term when navigating between pages if backend supports it via query params on next/previous URLs
       const data = await api.get(url).then((r) => r.data);
-      setClientsPage({
-        count: data?.count,
-        next: data?.next ?? null,
-        previous: data?.previous ?? null,
-        results: data?.results || [],
-      });
+      setClientsPage({ count: data?.count, next: data?.next ?? null, previous: data?.previous ?? null, results: data?.results || [] });
     } catch (e: any) {
       toast({ variant: "destructive", title: t("common.error"), description: e?.message || t("moderator.errors.loadClients") });
     } finally {
@@ -325,7 +305,6 @@ const ModeratorDashboard = () => {
       setClientsList(Array.isArray(clients) ? clients : (clients as any)?.results || []);
       setDoctorsList(Array.isArray(doctors) ? doctors : (doctors as any)?.results || []);
       setPetsList(Array.isArray(pets) ? pets : (pets as any)?.results || []);
-      // Seed name maps from fetched lists (best-effort)
       const cMap: Record<string | number, string> = {};
       (Array.isArray(clients) ? clients : (clients as any)?.results || []).forEach((c: any) => {
         const candidate = c.full_name ?? c.name ?? c.username ?? [c.first_name, c.last_name].filter(Boolean).join(" ");
@@ -354,24 +333,49 @@ const ModeratorDashboard = () => {
   }, []);
 
   useEffect(() => {
-    // Reload pets for selected client in creation form
+    setVisitPetId(null);
     if (visitClientId) {
-      void loadLists(visitClientId);
+      void loadLists(String(visitClientId));
     }
   }, [visitClientId]);
 
+  const searchVisitClients = useCallback(async (query: string) => {
+    setVisitClientSearchLoading(true);
+    try {
+      const params: Record<string, any> = { page_size: 20 };
+      if (query.trim()) params.name = query.trim();
+      const data = await Clients.list<any>(params as any);
+      const results: any[] = Array.isArray(data) ? data : (data as any)?.results || [];
+      setVisitClientItems(results.map((c: any) => ({
+        id: c.id,
+        label: [c.full_name, c.name, c.username, [c.first_name, c.last_name].filter(Boolean).join(" ")].find((v) => v && String(v).trim()) || `#${c.id}`,
+      })));
+    } catch {
+      setVisitClientItems([]);
+    } finally {
+      setVisitClientSearchLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => { void searchVisitClients(visitClientSearchQuery); }, 300);
+    return () => clearTimeout(timer);
+  }, [visitClientSearchQuery, searchVisitClients]);
+
   const handleCreateVisit = async () => {
-    if (!visitClientId || !visitDoctorId || !visitPetId) {
+    if (!visitClientId || !visitDoctorId) {
       toast({ variant: "destructive", title: t("moderator.visits.create.validation"), description: t("moderator.visits.create.validationDesc") });
       return;
     }
     setVisitCreating(true);
     try {
-      await Visits.create({ client: Number(visitClientId), doctor: Number(visitDoctorId), pet: Number(visitPetId) });
+      const payload: Record<string, any> = { client: Number(visitClientId), doctor: Number(visitDoctorId) };
+      if (visitPetId) payload.pet = Number(visitPetId);
+      await Visits.create(payload);
       toast({ title: t("moderator.visits.create.success") });
-      setVisitClientId("");
-      setVisitDoctorId("");
-      setVisitPetId("");
+      setVisitClientId(null);
+      setVisitDoctorId(null);
+      setVisitPetId(null);
       await handleSearchVisits();
     } catch (e: any) {
       toast({ variant: "destructive", title: t("moderator.visits.create.error"), description: e?.message || t("moderator.visits.create.errorDesc") });
@@ -440,16 +444,10 @@ const ModeratorDashboard = () => {
     }
   };
 
-  // handlePasswordReset removed
-
   const handleLoadRequests = async (url?: string) => {
     setRqLoading(true);
     try {
       const raw = url ? (await fetchPageByUrl(url)) : await RequestsApi.list<any>();
-      // Normalize various possible backend shapes:
-      // 1) Paginated: { count, next, previous, results: [...] }
-      // 2) Plain array: [...]
-      // 3) Wrapped with data/results alternative naming
       let results: any[] = [];
       let count: number | undefined = undefined;
       let next: string | null | undefined = undefined;
@@ -465,13 +463,11 @@ const ModeratorDashboard = () => {
           next = raw.next ?? null;
           previous = raw.previous ?? null;
         } else {
-          // Single object? wrap it for display
           results = [raw];
           count = 1;
         }
       }
       setRqPage({ count, next, previous, results });
-      // Fallback: if empty but no error and not loading a specific page, attempt alternative endpoint without trailing slash
       if (!url && results.length === 0) {
         try {
           const alt = await api.get('requests').then(r => r.data);
@@ -491,53 +487,31 @@ const ModeratorDashboard = () => {
 
   const handleLogout = async () => {
     tokenStore.clear();
-    toast({
-      title: t("dashboard.logout"),
-      description: t("common.goodbye"),
-    });
+    toast({ title: t("dashboard.logout"), description: t("common.goodbye") });
     navigate("/");
   };
 
-  // Helper function to get payment method label
   const getPaymentMethodLabel = (method: string | null | undefined): string => {
     if (!method) return "—";
     const m = method.toUpperCase();
     if (m === "CASH") return t("moderator.card.modal.paymentMethod.cash");
     if (m === "CARD") return t("moderator.card.modal.paymentMethod.card");
     if (m === "TRANSFER") return t("moderator.card.modal.paymentMethod.transfer");
-    // Fallback for old methods (for backward compatibility with existing data)
     if (m === "CLICK" || m === "PAYME") return t("moderator.card.modal.paymentMethod.card");
     if (m === "OTHER") return t("moderator.card.modal.paymentMethod.transfer");
     return method;
   };
 
-  // Helper function to get payment status and button variant
   const getPaymentStatus = (card: any) => {
     const status = (card?.status || "").toString().toUpperCase();
     const isPaid = card?.payment_confirmed ?? card?.is_paid ?? false;
-    
     if (isPaid || status === "PAID" || status === "FULLY_PAID" || status === "FULL_PAID") {
-      return {
-        label: t("client.medicalCards.status.paid"),
-        variant: "default" as const, // Green
-        className: "bg-green-500 hover:bg-green-600 text-white border-green-500"
-      };
+      return { label: t("client.medicalCards.status.paid"), variant: "default" as const, className: "bg-green-500 hover:bg-green-600 text-white border-green-500" };
     }
-    
     if (status === "PARTLY_PAID" || status === "PARTLY") {
-      return {
-        label: t("client.medicalCards.status.partlyPaid"),
-        variant: "secondary" as const, // Yellow
-        className: "bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500"
-      };
+      return { label: t("client.medicalCards.status.partlyPaid"), variant: "secondary" as const, className: "bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500" };
     }
-    
-    // Default: Waiting for Payment
-    return {
-      label: t("client.medicalCards.status.pending"),
-      variant: "destructive" as const, // Red
-      className: "bg-red-500 hover:bg-red-600 text-white border-red-500"
-    };
+    return { label: t("client.medicalCards.status.pending"), variant: "destructive" as const, className: "bg-red-500 hover:bg-red-600 text-white border-red-500" };
   };
 
   const handleBannerImageChange = async (file?: File | null) => {
@@ -567,979 +541,839 @@ const ModeratorDashboard = () => {
     );
   }
 
-  // If me is still not available after loading, try to refetch silently
   if (!me && !meLoading && meError) {
-    // Silently retry in background - don't show error to user
-    setTimeout(() => {
-      refetchMe();
-    }, 1000);
+    setTimeout(() => { refetchMe(); }, 1000);
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
-      {/* Header */}
-      <header className="border-b bg-background/80 backdrop-blur-md sticky top-0 z-50 animate-fade-in">
-        <div className="container px-4 py-4 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="flex items-center gap-3 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary transition hover:opacity-90 hover-scale"
-            aria-label={t("common.goHome")}
-          >
-            <img src={elvetLogo} alt="ELVET" className="w-12 h-12 rounded-xl object-cover shadow-glow border border-white/30" />
-            <div className="text-left">
-              <h1 className="text-xl font-bold bg-gradient-hero bg-clip-text text-transparent">ELVET</h1>
-              <p className="text-xs text-muted-foreground">{t("dashboard.moderator")}</p>
-            </div>
-          </button>
-          <div className="flex items-center gap-3">
-            <LanguageSwitcher />
-            <Button variant="outline" onClick={handleLogout} className="gap-2 hover-scale">
-              <LogOut className="w-4 h-4" />
-              {t("dashboard.logout")}
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen flex bg-gradient-to-br from-background via-muted/30 to-background">
+      {/* Sidebar */}
+      <ModeratorSidebar
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen((o) => !o)}
+        activeView={activeView}
+        onNavigate={handleNavigate}
+      />
 
-      {/* Main Content */}
-      <div className="container px-4 py-8">
-        {/* Hero Welcome Card with inline avatar change */}
-        <Card className="overflow-hidden border-0 shadow-elegant animate-fade-in mb-8">
-          <div className="bg-gradient-hero p-8 text-primary-foreground relative">
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnoiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4xIi8+PC9nPjwvc3ZnPg==')] opacity-20" />
-            <div className="relative flex items-center gap-4">
-              <div className="p-2 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-white/40 flex items-center justify-center relative group">
-                  {me?.image ? (
-                    // eslint-disable-next-line jsx-a11y/alt-text
-                    <img src={me.image} alt="avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="w-10 h-10" />
-                  )}
-                  <label className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleBannerImageChange(e.target.files?.[0])} />
-                    <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/90 text-black px-3 py-1 rounded-full shadow">
-                      <ImageIcon className="w-4 h-4" /> {bannerUploading ? t("moderator.banner.uploading") : t("moderator.banner.changeImage")}
-                    </span>
-                  </label>
-                </div>
+      {/* Main content column */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <header className="border-b bg-background/80 backdrop-blur-md sticky top-0 z-30 animate-fade-in">
+          <div className="px-4 py-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="flex items-center gap-3 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary transition hover:opacity-90 hover-scale"
+              aria-label={t("common.goHome")}
+            >
+              <img src={elvetLogo} alt="ELVET" className="w-12 h-12 rounded-xl object-cover shadow-glow border border-white/30" />
+              <div className="text-left">
+                <h1 className="text-xl font-bold bg-gradient-hero bg-clip-text text-transparent">ELVET</h1>
+                <p className="text-xs text-muted-foreground">{t("dashboard.moderator")}</p>
               </div>
-              <div>
-                <h2 className="text-3xl font-bold mb-1">
-                  {t("dashboard.welcome")}, {me?.first_name || me?.last_name ? `${me.first_name || ""} ${me.last_name || ""}`.trim() || t("moderator.banner.fallbackRole") : t("moderator.banner.fallbackRole")}! 👤
-                </h2>
-                <p className="text-primary-foreground/90 text-lg">{t("moderator.banner.subtitle")}</p>
-              </div>
+            </button>
+            <div className="flex items-center gap-3">
+              <LanguageSwitcher />
+              <Button variant="outline" onClick={handleLogout} className="gap-2 hover-scale">
+                <LogOut className="w-4 h-4" />
+                {t("dashboard.logout")}
+              </Button>
             </div>
           </div>
-        </Card>
+        </header>
 
-        {/* KPI Grid */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-emerald-50 to-transparent">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">💊 {t("moderator.kpi.medicinesAvailable")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">{kpis.medicinesAvailable}</div>
-              <p className="text-xs text-muted-foreground mt-1">{t("moderator.kpi.quantityGreaterThanZero")}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-sky-50 to-transparent">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">🛠️ {t("moderator.kpi.servicesCount")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">{kpis.servicesCount}</div>
-            </CardContent>
-          </Card>
-          <Card className="border-2 hover:shadow-glow transition-all animate-fade-in bg-gradient-to-br from-fuchsia-50 to-transparent">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">📅 {t("moderator.kpi.visitsCount")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">{kpis.visitsCount}</div>
-            </CardContent>
-          </Card>
-        </div>
+        {/* View Content */}
+        <main className="flex-1 px-4 py-8 overflow-auto">
 
-        {/* Dashboard Tabs */}
-        <Tabs defaultValue="medicalCards" className="w-full">
-          <TabsList className="w-full mb-8 h-auto p-1 rounded-xl border bg-muted/40 grid grid-cols-2 md:grid-cols-4 gap-2">
-            {/* First row */}
-            <TabsTrigger
-              value="medicalCards"
-              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-primary/10 data-[state=active]:text-primary hover:bg-muted text-sm"
-            >
-              <span className="flex-shrink-0">🧾</span>
-              <span className="truncate">{t("dashboard.medicalCards")}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="visits"
-              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 hover:bg-muted text-sm"
-            >
-              <span className="flex-shrink-0">📅</span>
-              <span className="truncate">{t("moderator.tabs.visits")}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="requests"
-              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 hover:bg-muted text-sm"
-            >
-              <span className="flex-shrink-0">📥</span>
-              <span className="truncate">{t("moderator.tabs.requests")}</span>
-            </TabsTrigger>
-
-            {/* Second row */}
-            <TabsTrigger
-              value="clients"
-              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-sky-100 data-[state=active]:text-sky-700 hover:bg-muted text-sm"
-            >
-              <span className="flex-shrink-0">👥</span>
-              <span className="truncate">{t("moderator.tabs.clients")}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="addUser"
-              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-fuchsia-100 data-[state=active]:text-fuchsia-700 hover:bg-muted text-sm"
-            >
-              <span className="flex-shrink-0">➕</span>
-              <span className="truncate">{t("moderator.tabs.addUser")}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="nurseCare"
-              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 hover:bg-muted text-sm"
-            >
-              <span className="flex-shrink-0">🩺</span>
-              <span className="truncate">{t("moderator.tabs.nurseCare")}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="feedSales"
-              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-lime-100 data-[state=active]:text-lime-700 hover:bg-muted text-sm"
-            >
-              <span className="flex-shrink-0">🍽️</span>
-              <span className="truncate">{t("moderator.tabs.feedSales")}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="feedInventory"
-              className="gap-2 py-3 px-3 rounded-lg transition flex items-center justify-center flex-shrink-0 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 hover:bg-muted text-sm"
-            >
-              <span className="flex-shrink-0">📦</span>
-              <span className="truncate">{t("moderator.tabs.feedInventory")}</span>
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Medical Cards: Waiting for Payment */}
-          <TabsContent value="medicalCards" className="space-y-6 animate-fade-in">
-            <Card className="border-2">
-              <CardHeader>
-                <CardTitle>{t("moderator.medicalCards.title")}</CardTitle>
-                <CardDescription>{t("moderator.medicalCards.subtitle")}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <Button variant="outline" onClick={loadWaitingCards} disabled={waitingLoading} className="gap-2">
-                    {waitingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-                    {t("moderator.medicalCards.refresh")}
-                  </Button>
-                </div>
-
-                <div className="rounded-lg border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>{t("moderator.card.table.client")}</TableHead>
-                        <TableHead>{t("moderator.card.table.pet")}</TableHead>
-                        <TableHead>{t("moderator.card.table.amount")}</TableHead>
-                        <TableHead>{t("moderator.card.table.status")}</TableHead>
-                        <TableHead className="text-right">{t("moderator.card.table.actions")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {waitingLoading ? (
-                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{t("common.loading")}</TableCell></TableRow>
-                      ) : waitingCards.length === 0 ? (
-                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{t("common.empty")}</TableCell></TableRow>
-                      ) : (
-                        waitingCards.map((c: any) => (
-                          <TableRow key={c.id}>
-                            <TableCell>{c.id}</TableCell>
-                            <TableCell>{c.client?.full_name ?? c.client_name ?? c.client ?? "—"}</TableCell>
-                            <TableCell>{c.pet?.name ?? c.pet_name ?? c.pet ?? "—"}</TableCell>
-                            <TableCell>{c.total_amount ?? c.total ?? "—"}</TableCell>
-                            <TableCell>
-                              {(() => {
-                                const statusInfo = getPaymentStatus(c);
-                                return (
-                                  <Button
-                                    size="sm"
-                                    className={statusInfo.className}
-                                    onClick={() => setSelectedCard(c)}
-                                  >
-                                    {statusInfo.label}
-                                  </Button>
-                                );
-                              })()}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button variant="ghost" size="sm" className="gap-2" onClick={() => setSelectedCard(c)}>{t("common.view")}</Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {/* Partly-paid cards */}
-                <div className="rounded-lg border mt-6 overflow-x-auto">
-                  <div className="px-4 py-3 border-b bg-muted/40 flex items-center justify-between">
-                    <p className="font-semibold text-sm">{t("moderator.card.partlyPaid.title")} ({partlyCards.length})</p>
-                    <span className="text-xs text-muted-foreground">{t("moderator.card.partlyPaid.status")}</span>
+          {/* ── MAIN (overview) ── */}
+          {activeView === "main" && (
+            <div className="space-y-8 animate-fade-in">
+              {/* Hero Welcome Card */}
+              <Card className="overflow-hidden border-0 shadow-elegant">
+                <div className="bg-gradient-hero p-8 text-primary-foreground relative">
+                  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnoiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4xIi8+PC9nPjwvc3ZnPg==')] opacity-20" />
+                  <div className="relative flex items-center gap-4">
+                    <div className="p-2 bg-white/20 backdrop-blur-sm rounded-2xl shadow-lg">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-white/40 flex items-center justify-center relative group">
+                        {me?.image ? (
+                          <img src={me.image} alt="avatar" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-10 h-10" />
+                        )}
+                        <label className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                          <input type="file" accept="image/*" className="hidden" onChange={(e) => handleBannerImageChange(e.target.files?.[0])} />
+                          <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/90 text-black px-3 py-1 rounded-full shadow">
+                            <ImageIcon className="w-4 h-4" /> {bannerUploading ? t("moderator.banner.uploading") : t("moderator.banner.changeImage")}
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                    <div>
+                      <h2 className="text-3xl font-bold mb-1">
+                        {t("dashboard.welcome")}, {me?.first_name || me?.last_name ? `${me.first_name || ""} ${me.last_name || ""}`.trim() || t("moderator.banner.fallbackRole") : t("moderator.banner.fallbackRole")}! 👤
+                      </h2>
+                      <p className="text-primary-foreground/90 text-lg">{t("moderator.banner.subtitle")}</p>
+                    </div>
                   </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>{t("moderator.card.table.client")}</TableHead>
-                        <TableHead>{t("moderator.card.table.pet")}</TableHead>
-                        <TableHead>{t("moderator.card.table.status")}</TableHead>
-                        <TableHead>{t("moderator.card.partlyPaid.table.total")}</TableHead>
-                        <TableHead>{t("moderator.card.partlyPaid.table.paid")}</TableHead>
-                        <TableHead>{t("moderator.card.partlyPaid.table.outstanding")}</TableHead>
-                        <TableHead className="text-right">{t("moderator.card.table.actions")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {waitingLoading ? (
-                        <TableRow>
-                          <TableCell colSpan={8} className="text-center text-muted-foreground">
-                            {t("common.loading")}
-                          </TableCell>
-                        </TableRow>
-                      ) : partlyCards.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={8} className="text-center text-muted-foreground">
-                            {t("common.empty")}
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        partlyCards.map((c: any) => (
-                          <TableRow key={`partly-${c.id}`}>
-                            <TableCell>{c.id}</TableCell>
-                            <TableCell>{c.client?.full_name ?? c.client_name ?? c.client ?? "—"}</TableCell>
-                            <TableCell>{c.pet?.name ?? c.pet_name ?? c.pet ?? "—"}</TableCell>
-                            <TableCell>
-                              {(() => {
-                                const statusInfo = getPaymentStatus(c);
-                                return (
-                                  <Button
-                                    size="sm"
-                                    className={statusInfo.className}
-                                    onClick={() => setSelectedCard(c)}
-                                  >
-                                    {statusInfo.label}
-                                  </Button>
-                                );
-                              })()}
-                            </TableCell>
-                            <TableCell>{c.total_fee ?? c.total_amount ?? c.total ?? "—"}</TableCell>
-                            <TableCell>{c.amount_paid ?? "0"}</TableCell>
-                            <TableCell>{c.outstanding_fee ?? (Number(c.total_fee ?? c.total_amount ?? c.total ?? 0) - Number(c.amount_paid ?? 0)).toFixed(2)}</TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="gap-2"
-                                onClick={() => setSelectedCard(c)}
-                              >
-                                {t("common.view")}
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              </Card>
 
-          <TabsContent value="nurseCare" className="space-y-6 animate-fade-in">
-            <ModeratorNurseCareCardsManager />
-          </TabsContent>
+              {/* KPI Grid */}
+              <div className="grid md:grid-cols-3 gap-6">
+                <Card className="border-2 hover:shadow-glow transition-all bg-gradient-to-br from-emerald-50 to-transparent">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">💊 {t("moderator.kpi.medicinesAvailable")}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-primary">{kpis.medicinesAvailable}</div>
+                    <p className="text-xs text-muted-foreground mt-1">{t("moderator.kpi.quantityGreaterThanZero")}</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-2 hover:shadow-glow transition-all bg-gradient-to-br from-sky-50 to-transparent">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">🛠️ {t("moderator.kpi.servicesCount")}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-primary">{kpis.servicesCount}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-2 hover:shadow-glow transition-all bg-gradient-to-br from-fuchsia-50 to-transparent">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">📅 {t("moderator.kpi.visitsCount")}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-primary">{kpis.visitsCount}</div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
 
-          <TabsContent value="staff-salaries" className="space-y-6 animate-fade-in">
-            <StaffSalaryDashboard />
-          </TabsContent>
-
-          <TabsContent value="feedSales" className="space-y-6 animate-fade-in">
-            <FeedSalesManager />
-          </TabsContent>
-
-          <TabsContent value="feedInventory" className="space-y-6 animate-fade-in">
-            <FeedInventory />
-          </TabsContent>
-
-          {/* Clients list */}
-          <TabsContent value="clients" className="space-y-6 animate-fade-in">
-            <Card className="border-2">
-              <CardHeader>
-                <CardTitle>{t("moderator.clients.title")}</CardTitle>
-                <CardDescription>{t("moderator.clients.subtitle")}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-3 gap-3">
+          {/* ── MEDICAL CARDS ── */}
+          {activeView === "medical-cards" && (
+            <div className="space-y-6 animate-fade-in">
+              <Card className="border-2">
+                <CardHeader>
+                  <CardTitle>{t("moderator.medicalCards.title")}</CardTitle>
+                  <CardDescription>{t("moderator.medicalCards.subtitle")}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
                   <div>
-                    <Label htmlFor="clientFilterId">{t("moderator.clients.filter.id")}</Label>
-                    <Input
-                      id="clientFilterId"
-                      value={clientFilterId}
-                      onChange={(e) => setClientFilterId(e.target.value)}
-                      placeholder={t("moderator.clients.filter.idPlaceholder")}
-                    />
+                    <Button variant="outline" onClick={loadWaitingCards} disabled={waitingLoading} className="gap-2">
+                      {waitingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+                      {t("moderator.medicalCards.refresh")}
+                    </Button>
                   </div>
-                  <div>
-                    <Label htmlFor="clientFilterName">{t("moderator.clients.filter.name")}</Label>
-                    <Input
-                      id="clientFilterName"
-                      value={clientFilterName}
-                      onChange={(e) => setClientFilterName(e.target.value)}
-                      placeholder={t("moderator.clients.filter.namePlaceholder")}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="clientFilterPhone">{t("moderator.clients.filter.phone")}</Label>
-                    <Input
-                      id="clientFilterPhone"
-                      value={clientFilterPhone}
-                      onChange={(e) => setClientFilterPhone(e.target.value)}
-                      placeholder={t("moderator.clients.filter.phonePlaceholder")}
-                    />
-                  </div>
-                </div>
 
-                <div className="rounded-lg border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("moderator.clients.table.id")}</TableHead>
-                        <TableHead>{t("moderator.clients.table.firstName")}</TableHead>
-                        <TableHead>{t("moderator.clients.table.lastName")}</TableHead>
-                        <TableHead>{t("moderator.clients.table.phone")}</TableHead>
-                        <TableHead>{t("moderator.clients.table.extraPhone1")}</TableHead>
-                        <TableHead>{t("moderator.clients.table.extraPhone2")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {clientsLoading ? (
+                  <div className="rounded-lg border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
-                            {t("common.loading")}
-                          </TableCell>
+                          <TableHead>ID</TableHead>
+                          <TableHead>{t("moderator.card.table.client")}</TableHead>
+                          <TableHead>{t("moderator.card.table.pet")}</TableHead>
+                          <TableHead>{t("moderator.card.table.amount")}</TableHead>
+                          <TableHead>{t("moderator.card.table.status")}</TableHead>
+                          <TableHead className="text-right">{t("moderator.card.table.actions")}</TableHead>
                         </TableRow>
-                      ) : clientsPage.results.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
-                            {t("moderator.clients.empty")}
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        clientsPage.results.map((c: any) => {
-                          const firstName = c.first_name || "---";
-                          const lastName = c.last_name || "---";
-                          const phone = c.phone_number || c.phone || "---";
-                          const extra1 = c.extra_phone_number1 || c.extra_number1 || "---";
-                          const extra2 = c.extra_phone_number2 || c.extra_number2 || "---";
-                          return (
+                      </TableHeader>
+                      <TableBody>
+                        {waitingLoading ? (
+                          <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{t("common.loading")}</TableCell></TableRow>
+                        ) : waitingCards.length === 0 ? (
+                          <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{t("common.empty")}</TableCell></TableRow>
+                        ) : (
+                          waitingCards.map((c: any) => (
                             <TableRow key={c.id}>
                               <TableCell>{c.id}</TableCell>
-                              <TableCell>{firstName}</TableCell>
-                              <TableCell>{lastName}</TableCell>
-                              <TableCell>{phone}</TableCell>
-                              <TableCell>{extra1}</TableCell>
-                              <TableCell>{extra2}</TableCell>
+                              <TableCell>{c.client?.full_name ?? c.client_name ?? c.client ?? "—"}</TableCell>
+                              <TableCell>{c.pet?.name ?? c.pet_name ?? c.pet ?? "—"}</TableCell>
+                              <TableCell>{c.total_amount ?? c.total ?? "—"}</TableCell>
+                              <TableCell>
+                                {(() => {
+                                  const statusInfo = getPaymentStatus(c);
+                                  return (
+                                    <Button size="sm" className={statusInfo.className} onClick={() => setSelectedCard(c)}>
+                                      {statusInfo.label}
+                                    </Button>
+                                  );
+                                })()}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button variant="ghost" size="sm" className="gap-2" onClick={() => setSelectedCard(c)}>{t("common.view")}</Button>
+                              </TableCell>
                             </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                <div className="flex justify-between">
-                  <Button
-                    variant="outline"
-                    disabled={!clientsPage.previous || clientsLoading}
-                    onClick={() => fetchClientsPageByUrl(clientsPage.previous)}
-                  >
-                    {t("common.prev")}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    disabled={!clientsPage.next || clientsLoading}
-                    onClick={() => fetchClientsPageByUrl(clientsPage.next)}
-                  >
-                    {t("common.next")}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Add user (client) */}
-          <TabsContent value="addUser" className="space-y-6 animate-fade-in">
-            <Card className="border-2">
-              <CardHeader>
-                <CardTitle>{t("moderator.addUser.title")}</CardTitle>
-                <CardDescription>{t("moderator.addUser.subtitle")}</CardDescription>
-              </CardHeader>
-              <AddClientForm />
-            </Card>
-          </TabsContent>
-
-          {/* Visits */}
-          <TabsContent value="visits" className="space-y-6 animate-fade-in">
-            {/* Create Visit */}
-            <Card className="border-2">
-              <CardHeader>
-                <CardTitle>{t("moderator.visits.create.title")}</CardTitle>
-                <CardDescription>{t("moderator.visits.create.subtitle")}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid md:grid-cols-3 gap-3">
-                  <div>
-                    <Label>{t("moderator.visits.create.client")}</Label>
-                    <Select value={visitClientId} onValueChange={(v) => setVisitClientId(v)}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder={listsLoading ? t("moderator.select.loading") : t("moderator.select.client")} /></SelectTrigger>
-                      <SelectContent>
-                        {clientsList.map((c: any) => {
-                          const candidate = c.full_name ?? c.name ?? c.username ?? [c.first_name, c.last_name].filter(Boolean).join(" ");
-                          const label = candidate && candidate.length > 0 ? candidate : `#${c.id}`;
-                          return (
-                            <SelectItem key={`client-${c.id}`} value={String(c.id)}>{label}</SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
                   </div>
-                  <div>
-                    <Label>{t("moderator.visits.create.doctor")}</Label>
-                    <Select value={visitDoctorId} onValueChange={(v) => setVisitDoctorId(v)}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder={listsLoading ? t("moderator.select.loading") : t("moderator.select.doctor")} /></SelectTrigger>
-                      <SelectContent>
-                        {doctorsList.map((d: any) => {
-                          const candidate = d.full_name ?? d.name ?? d.username ?? d.user?.full_name ?? [d.first_name, d.last_name].filter(Boolean).join(" ");
-                          const label = candidate && candidate.length > 0 ? candidate : `#${d.id}`;
-                          return (
-                            <SelectItem key={`doctor-${d.id}`} value={String(d.id)}>{label}</SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
+
+                  {/* Partly-paid cards */}
+                  <div className="rounded-lg border mt-6 overflow-x-auto">
+                    <div className="px-4 py-3 border-b bg-muted/40 flex items-center justify-between">
+                      <p className="font-semibold text-sm">{t("moderator.card.partlyPaid.title")} ({partlyCards.length})</p>
+                      <span className="text-xs text-muted-foreground">{t("moderator.card.partlyPaid.status")}</span>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>ID</TableHead>
+                          <TableHead>{t("moderator.card.table.client")}</TableHead>
+                          <TableHead>{t("moderator.card.table.pet")}</TableHead>
+                          <TableHead>{t("moderator.card.table.status")}</TableHead>
+                          <TableHead>{t("moderator.card.partlyPaid.table.total")}</TableHead>
+                          <TableHead>{t("moderator.card.partlyPaid.table.paid")}</TableHead>
+                          <TableHead>{t("moderator.card.partlyPaid.table.outstanding")}</TableHead>
+                          <TableHead className="text-right">{t("moderator.card.table.actions")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {waitingLoading ? (
+                          <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">{t("common.loading")}</TableCell></TableRow>
+                        ) : partlyCards.length === 0 ? (
+                          <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">{t("common.empty")}</TableCell></TableRow>
+                        ) : (
+                          partlyCards.map((c: any) => (
+                            <TableRow key={`partly-${c.id}`}>
+                              <TableCell>{c.id}</TableCell>
+                              <TableCell>{c.client?.full_name ?? c.client_name ?? c.client ?? "—"}</TableCell>
+                              <TableCell>{c.pet?.name ?? c.pet_name ?? c.pet ?? "—"}</TableCell>
+                              <TableCell>
+                                {(() => {
+                                  const statusInfo = getPaymentStatus(c);
+                                  return (
+                                    <Button size="sm" className={statusInfo.className} onClick={() => setSelectedCard(c)}>
+                                      {statusInfo.label}
+                                    </Button>
+                                  );
+                                })()}
+                              </TableCell>
+                              <TableCell>{c.total_fee ?? c.total_amount ?? c.total ?? "—"}</TableCell>
+                              <TableCell>{c.amount_paid ?? "0"}</TableCell>
+                              <TableCell>{c.outstanding_fee ?? (Number(c.total_fee ?? c.total_amount ?? c.total ?? 0) - Number(c.amount_paid ?? 0)).toFixed(2)}</TableCell>
+                              <TableCell className="text-right">
+                                <Button variant="ghost" size="sm" className="gap-2" onClick={() => setSelectedCard(c)}>{t("common.view")}</Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
                   </div>
-                  <div>
-                    <Label>{t("moderator.visits.create.pet")}</Label>
-                    <Select value={visitPetId} onValueChange={(v) => setVisitPetId(v)}>
-                      <SelectTrigger className="w-full"><SelectValue placeholder={listsLoading ? t("moderator.select.loading") : t("moderator.select.pet")} /></SelectTrigger>
-                      <SelectContent>
-                        {petsList.map((p: any) => (
-                          <SelectItem key={`pet-${p.id}`} value={String(p.id)}>{p.name ?? p.nickname ?? `#${p.id}`}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <Button onClick={handleCreateVisit} disabled={visitCreating} className="gap-2">
-                    {visitCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-                    {t("common.create")}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
-            <Card className="border-2">
-              <CardHeader>
-                <CardTitle>{t("moderator.visits.history.title")}</CardTitle>
-                <CardDescription>{t("moderator.visits.history.subtitle")}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Button onClick={handleSearchVisits} disabled={visitsLoading} variant="outline" className="gap-2">
-                    {visitsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-                    {t("moderator.visits.refresh")}
-                  </Button>
-                </div>
-
-                <div className="rounded-lg border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("moderator.visits.table.date")}</TableHead>
-                        <TableHead>{t("moderator.visits.table.client")}</TableHead>
-                        <TableHead>{t("moderator.visits.table.doctor")}</TableHead>
-                        <TableHead>{t("moderator.visits.table.pet")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {visitsPage.results.length === 0 ? (
-                        <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">{t("common.empty")}</TableCell></TableRow>
-                      ) : (
-                        visitsPage.results.map((v: any, idx: number) => (
-                          <TableRow key={v.id ?? idx}>
-                            <TableCell>{v.created_at ? new Date(v.created_at).toLocaleString("ru-RU") : "—"}</TableCell>
-                            <TableCell>{v.client?.full_name ?? clientNames[v.client] ?? "—"}</TableCell>
-                            <TableCell>{v.doctor?.full_name ?? doctorNames[v.doctor] ?? "—"}</TableCell>
-                            <TableCell>{v.pet?.name ?? petNames[v.pet] ?? "—"}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                <div className="flex justify-between">
-                  <Button variant="outline" disabled={!visitsPage.previous} onClick={() => handleVisitsPageNav("previous")}>{t("common.prev")}</Button>
-                  <Button variant="outline" disabled={!visitsPage.next} onClick={() => handleVisitsPageNav("next")}>{t("common.next")}</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Requests inbox */}
-          <TabsContent value="requests" className="space-y-6 animate-fade-in">
-            <Card className="border-2">
-              <CardHeader>
-                <CardTitle>{t("moderator.requests.title")} {typeof rqPage.count === 'number' ? `(${rqPage.count})` : ''}</CardTitle>
-                <CardDescription>{t("moderator.requests.subtitle")}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Button onClick={() => handleLoadRequests()} disabled={rqLoading} variant="outline" className="gap-2">
-                    {rqLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-                    {t("moderator.requests.refresh")}
-                  </Button>
-                </div>
-                <div className="rounded-lg border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("moderator.requests.table.id")}</TableHead>
-                        <TableHead>{t("moderator.requests.table.firstName")}</TableHead>
-                        <TableHead>{t("moderator.requests.table.lastName")}</TableHead>
-                        <TableHead>{t("moderator.requests.table.phone")}</TableHead>
-                        <TableHead>{t("moderator.requests.table.created")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {rqPage.results.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">{t("common.empty")}</TableCell></TableRow>
-                      ) : (
-                        rqPage.results.map((r: any) => (
-                          <TableRow key={r.id}>
-                            <TableCell>{r.id}</TableCell>
-                            <TableCell>{r.first_name || "—"}</TableCell>
-                            <TableCell>{r.last_name || "—"}</TableCell>
-                            <TableCell>{r.phone_number ?? r.phone ?? "—"}</TableCell>
-                            <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString("ru-RU") : "—"}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-                <div className="flex justify-between">
-                  <Button variant="outline" disabled={!rqPage.previous} onClick={() => handleLoadRequests(rqPage.previous || undefined)}>{t("common.prev")}</Button>
-                  <Button variant="outline" disabled={!rqPage.next} onClick={() => handleLoadRequests(rqPage.next || undefined)}>{t("common.next")}</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Modal: Medical card details and confirm payment */}
-          {selectedCard && (
-            <Dialog open={!!selectedCard} onOpenChange={(open) => { if (!open) setSelectedCard(null); }}>
-              <DialogContent className="max-w-3xl max-h-[90vh] sm:max-h-[85vh] flex flex-col">
-                <DialogHeader>
-                  <DialogTitle>{t("moderator.card.modal.title", { id: selectedCard?.id })}</DialogTitle>
-                  <DialogDescription>{t("moderator.card.modal.subtitle")}</DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-3 overflow-y-auto pr-1 sm:pr-2">
+          {/* ── VISITS ── */}
+          {activeView === "visits" && (
+            <div className="space-y-6 animate-fade-in">
+              <Card className="border-2">
+                <CardHeader>
+                  <CardTitle>{t("moderator.visits.create.title")}</CardTitle>
+                  <CardDescription>{t("moderator.visits.create.subtitle")}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div>
-                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.client")}</p>
-                      <p className="font-medium">{selectedCard?.client?.full_name ?? selectedCard?.client_name ?? selectedCard?.client ?? "—"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.pet")}</p>
-                      <p className="font-medium">{selectedCard?.pet?.name ?? selectedCard?.pet_name ?? selectedCard?.pet ?? "—"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.status")}</p>
-                      {(() => {
-                        const statusInfo = getPaymentStatus(selectedCard);
-                        return (
-                          <Button
-                            size="sm"
-                            className={statusInfo.className}
-                            onClick={() => {}}
-                          >
-                            {statusInfo.label}
-                          </Button>
-                        );
-                      })()}
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.total")}</p>
-                      <p className="font-semibold">{selectedCard?.total_fee ?? selectedCard?.total_amount ?? selectedCard?.total ?? "—"}</p>
-                    </div>
-                  </div>
-
-                  {/* Payment summary */}
-                  {typeof selectedCard?.total_fee !== "undefined" && (
-                    <div className="grid sm:grid-cols-3 gap-3">
-                      <div className="p-3 border rounded-lg bg-background">
-                        <p className="text-xs text-muted-foreground">{t("moderator.card.modal.paid")}</p>
-                        <p className="font-semibold">{selectedCard?.amount_paid ?? "0"}</p>
-                      </div>
-                      <div className="p-3 border rounded-lg bg-background">
-                        <p className="text-xs text-muted-foreground">{t("moderator.card.modal.outstanding")}</p>
-                        <p className="font-semibold">{selectedCard?.outstanding_fee ?? "0"}</p>
-                      </div>
-                      <div className="p-3 border rounded-lg bg-background flex flex-col justify-between">
-                        <p className="text-xs text-muted-foreground mb-1">{t("moderator.card.modal.progress")}</p>
-                        {(() => {
-                          const total = Number(selectedCard?.total_fee || selectedCard?.total_amount || 0);
-                          const paid = Number(selectedCard?.amount_paid || 0);
-                          const pct = total > 0 ? Math.min(100, Math.max(0, (paid / total) * 100)) : 0;
-                          return (
-                            <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
-                              <div
-                                className="h-2 bg-green-500 transition-all"
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedCard?.anamnesis && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">{t("moderator.card.modal.anamnesis")}</p>
-                      <div className="border rounded p-2 bg-muted/30 whitespace-pre-wrap text-sm">{selectedCard.anamnesis}</div>
-                    </div>
-                  )}
-
-                  {selectedCard?.recommended_feed_text && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">{t("moderator.card.modal.recommendedFeed")}</p>
-                      <div className="border rounded p-2 bg-muted/30 whitespace-pre-wrap text-sm">
-                        {selectedCard.recommended_feed_text}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Fee breakdown */}
-                  <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-                    <div className="p-3 border rounded-lg bg-background">
-                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.feeTotal")}</p>
-                      <p className="font-semibold">{selectedCard?.total_fee ?? selectedCard?.total_amount ?? selectedCard?.total ?? "—"}</p>
-                    </div>
-                    <div className="p-3 border rounded-lg bg-background">
-                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.feeStationary")}</p>
-                      <p className="font-semibold">{selectedCard?.stationary_fee ?? selectedCard?.stationary_total ?? "—"}</p>
-                    </div>
-                    <div className="p-3 border rounded-lg bg-background">
-                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.feeMedicines")}</p>
-                      <p className="font-semibold">{selectedCard?.medicines_fee ?? selectedCard?.medicines_total ?? "—"}</p>
-                    </div>
-                    <div className="p-3 border rounded-lg bg-background">
-                      <p className="text-xs text-muted-foreground">{t("moderator.card.modal.feeServices")}</p>
-                      <p className="font-semibold">{selectedCard?.services_fee ?? selectedCard?.services_total ?? "—"}</p>
-                    </div>
-                  </div>
-
-                  {/* Used services */}
-                  <div>
-                    <p className="text-sm font-semibold mb-2">{t("moderator.card.modal.servicesTitle")} ({cardServices.length})</p>
-                    {itemsLoading ? (
-                      <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
-                    ) : cardServices.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">{t("doctor.edit.services.empty")}</p>
-                    ) : (
-                      <div className="border rounded-lg overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>{t("moderator.card.modal.servicesTable.service")}</TableHead>
-                              <TableHead>{t("moderator.card.modal.servicesTable.quantity")}</TableHead>
-                              <TableHead>{t("moderator.card.modal.servicesTable.price")}</TableHead>
-                              <TableHead>{t("moderator.card.modal.servicesTable.total")}</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {cardServices.map((s: any, idx: number) => {
-                              const name = s?.service?.name ?? s?.services?.name ?? s?.service_name ?? s?.name ?? `#${s?.id ?? idx}`;
-                              const qty = s?.quantity ?? s?.qty ?? 1;
-                              const price = s?.price ?? s?.unit_price ?? 0;
-                              const total = Number(qty) * Number(price);
-                              return (
-                                <TableRow key={`svc-${s?.id ?? idx}`}>
-                                  <TableCell>{name}</TableCell>
-                                  <TableCell>{qty}</TableCell>
-                                  <TableCell>{price} сум</TableCell>
-                                  <TableCell className="font-semibold">{total} сум</TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Used medicines */}
-                  <div>
-                    <p className="text-sm font-semibold mb-2">{t("moderator.card.modal.medicinesTitle")} ({cardMedicines.length})</p>
-                    {itemsLoading ? (
-                      <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
-                    ) : cardMedicines.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">{t("doctor.edit.medicines.empty")}</p>
-                    ) : (
-                      <div className="border rounded-lg overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>{t("moderator.card.modal.medicinesTable.medicine")}</TableHead>
-                              <TableHead>{t("moderator.card.modal.medicinesTable.quantity")}</TableHead>
-                              <TableHead>{t("moderator.card.modal.medicinesTable.price")}</TableHead>
-                              <TableHead>{t("moderator.card.modal.medicinesTable.total")}</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {cardMedicines.map((m: any, idx: number) => {
-                              const name = m?.medicine?.name ?? m?.medicines?.name ?? m?.medicine_name ?? m?.name ?? `#${m?.id ?? idx}`;
-                              const qty = m?.quantity ?? m?.qty ?? 1;
-                              const price = m?.price ?? m?.unit_price ?? 0;
-                              const total = Number(qty) * Number(price);
-                              return (
-                                <TableRow key={`med-${m?.id ?? idx}`}>
-                                  <TableCell>{name}</TableCell>
-                                  <TableCell>{qty}</TableCell>
-                                  <TableCell>{price} сум</TableCell>
-                                  <TableCell className="font-semibold">{total} сум</TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Payments list */}
-                  <div>
-                    <p className="text-sm font-semibold mb-2">{t("moderator.card.modal.paymentsTitle")} ({payments.length})</p>
-                    {paymentsLoading ? (
-                      <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
-                    ) : payments.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">{t("moderator.card.modal.paymentsEmpty")}</p>
-                    ) : (
-                      <div className="border rounded-lg overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>{t("moderator.card.modal.paymentsTable.date")}</TableHead>
-                              <TableHead>{t("moderator.card.modal.paymentsTable.method")}</TableHead>
-                              <TableHead>{t("moderator.card.modal.paymentsTable.amount")}</TableHead>
-                              <TableHead>{t("moderator.card.modal.paymentsTable.note")}</TableHead>
-                              <TableHead>{t("moderator.card.modal.paymentsTable.recordedBy")}</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {payments.map((p: any, idx: number) => (
-                              <TableRow key={p.id ?? idx}>
-                                <TableCell>{p.created_at ? new Date(p.created_at).toLocaleString("ru-RU") : "—"}</TableCell>
-                                <TableCell>{getPaymentMethodLabel(p.method)}</TableCell>
-                                <TableCell>{p.amount ?? "—"}</TableCell>
-                                <TableCell>{p.note ?? "—"}</TableCell>
-                                <TableCell>{p.recorded_by ?? "—"}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Payment actions */}
-                <div className="space-y-4 pt-4 border-t mt-4">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="paymentAmount">{t("moderator.card.modal.paymentAmount")}</Label>
-                      <Input
-                        id="paymentAmount"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={paymentAmount}
-                        onChange={(e) => setPaymentAmount(e.target.value)}
-                        placeholder={selectedCard?.outstanding_fee ?? "0"}
+                      <Label>{t("moderator.visits.create.client")} *</Label>
+                      <SearchableCombobox
+                        value={visitClientId}
+                        onChange={(v) => setVisitClientId(v ? String(v) : null)}
+                        items={visitClientItems}
+                        placeholder={t("moderator.select.client")}
+                        searchPlaceholder={t("common.search")}
+                        emptyText={t("common.nothingFound")}
+                        onSearch={setVisitClientSearchQuery}
+                        loading={visitClientSearchLoading}
                       />
                     </div>
+                    <div>
+                      <Label>{t("moderator.visits.create.doctor")} *</Label>
+                      <SearchableCombobox
+                        value={visitDoctorId}
+                        onChange={(v) => setVisitDoctorId(v ? String(v) : null)}
+                        items={doctorsList.map((d: any) => ({
+                          id: d.id,
+                          label: ([d.full_name, d.name, d.username, d.user?.full_name, [d.first_name, d.last_name].filter(Boolean).join(" ")] as string[]).find((v) => v && String(v).trim()) || `#${d.id}`,
+                        }))}
+                        placeholder={t("moderator.select.doctor")}
+                        searchPlaceholder={t("common.search")}
+                        emptyText={t("common.nothingFound")}
+                        loading={listsLoading}
+                      />
+                    </div>
+                  </div>
+                  {visitClientId && (
+                    <div className="max-w-sm">
+                      <Label>
+                        {t("moderator.visits.create.pet")}
+                        <span className="text-muted-foreground text-xs ml-1">({t("common.optional", "необязательно")})</span>
+                      </Label>
+                      <SearchableCombobox
+                        value={visitPetId}
+                        onChange={(v) => setVisitPetId(v ? String(v) : null)}
+                        items={petsList.map((p: any) => ({
+                          id: p.id,
+                          label: p.name ?? p.nickname ?? `#${p.id}`,
+                        }))}
+                        placeholder={t("moderator.select.pet")}
+                        searchPlaceholder={t("common.search")}
+                        emptyText={t("common.nothingFound")}
+                        loading={listsLoading}
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <Button onClick={handleCreateVisit} disabled={visitCreating} className="gap-2">
+                      {visitCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+                      {t("common.create")}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
-                    <div className="space-y-2">
-                      <Label>{t("moderator.card.modal.paymentMethod")}</Label>
-                      <div className="grid grid-cols-3 gap-3">
-                        {["CASH", "CARD", "TRANSFER"].map((m) => {
-                          const isActive = paymentMethod === m;
-                          const label =
-                            m === "CASH" 
-                              ? t("moderator.card.modal.paymentMethod.cash") 
-                              : m === "CARD" 
-                              ? t("moderator.card.modal.paymentMethod.card") 
-                              : t("moderator.card.modal.paymentMethod.transfer");
-                          const imgSrc =
-                            m === "CASH"
-                              ? cashImg
-                              : m === "CARD"
-                              ? cardImg
-                              : transferImg;
+              <Card className="border-2">
+                <CardHeader>
+                  <CardTitle>{t("moderator.visits.history.title")}</CardTitle>
+                  <CardDescription>{t("moderator.visits.history.subtitle")}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Button onClick={handleSearchVisits} disabled={visitsLoading} variant="outline" className="gap-2">
+                      {visitsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+                      {t("moderator.visits.refresh")}
+                    </Button>
+                  </div>
+                  <div className="rounded-lg border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t("moderator.visits.table.date")}</TableHead>
+                          <TableHead>{t("moderator.visits.table.client")}</TableHead>
+                          <TableHead>{t("moderator.visits.table.doctor")}</TableHead>
+                          <TableHead>{t("moderator.visits.table.pet")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {visitsPage.results.length === 0 ? (
+                          <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">{t("common.empty")}</TableCell></TableRow>
+                        ) : (
+                          visitsPage.results.map((v: any, idx: number) => (
+                            <TableRow key={v.id ?? idx}>
+                              <TableCell>{v.created_at ? new Date(v.created_at).toLocaleString("ru-RU") : "—"}</TableCell>
+                              <TableCell>{v.client?.full_name ?? clientNames[v.client] ?? "—"}</TableCell>
+                              <TableCell>{v.doctor?.full_name ?? doctorNames[v.doctor] ?? "—"}</TableCell>
+                              <TableCell>{v.pet?.name ?? petNames[v.pet] ?? "—"}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="flex justify-between">
+                    <Button variant="outline" disabled={!visitsPage.previous} onClick={() => handleVisitsPageNav("previous")}>{t("common.prev")}</Button>
+                    <Button variant="outline" disabled={!visitsPage.next} onClick={() => handleVisitsPageNav("next")}>{t("common.next")}</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* ── REQUESTS ── */}
+          {activeView === "requests" && (
+            <div className="space-y-6 animate-fade-in">
+              <Card className="border-2">
+                <CardHeader>
+                  <CardTitle>{t("moderator.requests.title")} {typeof rqPage.count === 'number' ? `(${rqPage.count})` : ''}</CardTitle>
+                  <CardDescription>{t("moderator.requests.subtitle")}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Button onClick={() => handleLoadRequests()} disabled={rqLoading} variant="outline" className="gap-2">
+                      {rqLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+                      {t("moderator.requests.refresh")}
+                    </Button>
+                  </div>
+                  <div className="rounded-lg border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t("moderator.requests.table.id")}</TableHead>
+                          <TableHead>{t("moderator.requests.table.firstName")}</TableHead>
+                          <TableHead>{t("moderator.requests.table.lastName")}</TableHead>
+                          <TableHead>{t("moderator.requests.table.phone")}</TableHead>
+                          <TableHead>{t("moderator.requests.table.created")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rqPage.results.length === 0 ? (
+                          <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">{t("common.empty")}</TableCell></TableRow>
+                        ) : (
+                          rqPage.results.map((r: any) => (
+                            <TableRow key={r.id}>
+                              <TableCell>{r.id}</TableCell>
+                              <TableCell>{r.first_name || "—"}</TableCell>
+                              <TableCell>{r.last_name || "—"}</TableCell>
+                              <TableCell>{r.phone_number ?? r.phone ?? "—"}</TableCell>
+                              <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString("ru-RU") : "—"}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="flex justify-between">
+                    <Button variant="outline" disabled={!rqPage.previous} onClick={() => handleLoadRequests(rqPage.previous || undefined)}>{t("common.prev")}</Button>
+                    <Button variant="outline" disabled={!rqPage.next} onClick={() => handleLoadRequests(rqPage.next || undefined)}>{t("common.next")}</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* ── CLIENTS ── */}
+          {activeView === "clients" && (
+            <div className="space-y-6 animate-fade-in">
+              <Card className="border-2">
+                <CardHeader>
+                  <CardTitle>{t("moderator.clients.title")}</CardTitle>
+                  <CardDescription>{t("moderator.clients.subtitle")}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid md:grid-cols-3 gap-3">
+                    <div>
+                      <Label htmlFor="clientFilterId">{t("moderator.clients.filter.id")}</Label>
+                      <Input id="clientFilterId" value={clientFilterId} onChange={(e) => setClientFilterId(e.target.value)} placeholder={t("moderator.clients.filter.idPlaceholder")} />
+                    </div>
+                    <div>
+                      <Label htmlFor="clientFilterName">{t("moderator.clients.filter.name")}</Label>
+                      <Input id="clientFilterName" value={clientFilterName} onChange={(e) => setClientFilterName(e.target.value)} placeholder={t("moderator.clients.filter.namePlaceholder")} />
+                    </div>
+                    <div>
+                      <Label htmlFor="clientFilterPhone">{t("moderator.clients.filter.phone")}</Label>
+                      <Input id="clientFilterPhone" value={clientFilterPhone} onChange={(e) => setClientFilterPhone(e.target.value)} placeholder={t("moderator.clients.filter.phonePlaceholder")} />
+                    </div>
+                  </div>
+                  <div className="rounded-lg border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t("moderator.clients.table.id")}</TableHead>
+                          <TableHead>{t("moderator.clients.table.firstName")}</TableHead>
+                          <TableHead>{t("moderator.clients.table.lastName")}</TableHead>
+                          <TableHead>{t("moderator.clients.table.phone")}</TableHead>
+                          <TableHead>{t("moderator.clients.table.extraPhone1")}</TableHead>
+                          <TableHead>{t("moderator.clients.table.extraPhone2")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {clientsLoading ? (
+                          <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{t("common.loading")}</TableCell></TableRow>
+                        ) : clientsPage.results.length === 0 ? (
+                          <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{t("moderator.clients.empty")}</TableCell></TableRow>
+                        ) : (
+                          clientsPage.results.map((c: any) => {
+                            const firstName = c.first_name || "---";
+                            const lastName = c.last_name || "---";
+                            const phone = c.phone_number || c.phone || "---";
+                            const extra1 = c.extra_phone_number1 || c.extra_number1 || "---";
+                            const extra2 = c.extra_phone_number2 || c.extra_number2 || "---";
+                            return (
+                              <TableRow key={c.id}>
+                                <TableCell>{c.id}</TableCell>
+                                <TableCell>{firstName}</TableCell>
+                                <TableCell>{lastName}</TableCell>
+                                <TableCell>{phone}</TableCell>
+                                <TableCell>{extra1}</TableCell>
+                                <TableCell>{extra2}</TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="flex justify-between">
+                    <Button variant="outline" disabled={!clientsPage.previous || clientsLoading} onClick={() => fetchClientsPageByUrl(clientsPage.previous)}>{t("common.prev")}</Button>
+                    <Button variant="outline" disabled={!clientsPage.next || clientsLoading} onClick={() => fetchClientsPageByUrl(clientsPage.next)}>{t("common.next")}</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* ── ADD CLIENT ── */}
+          {activeView === "add-client" && (
+            <div className="space-y-6 animate-fade-in">
+              <Card className="border-2">
+                <CardHeader>
+                  <CardTitle>{t("moderator.addUser.title")}</CardTitle>
+                  <CardDescription>{t("moderator.addUser.subtitle")}</CardDescription>
+                </CardHeader>
+                <AddClientForm />
+              </Card>
+            </div>
+          )}
+
+          {/* ── NURSE CARE ── */}
+          {activeView === "nurse-care" && (
+            <div className="space-y-6 animate-fade-in">
+              <ModeratorNurseCareCardsManager />
+            </div>
+          )}
+
+          {/* ── FEED SALES ── */}
+          {activeView === "feed-sales" && (
+            <div className="space-y-6 animate-fade-in">
+              <FeedSalesManager />
+            </div>
+          )}
+
+          {/* ── FEED INVENTORY ── */}
+          {activeView === "feed-inventory" && (
+            <div className="space-y-6 animate-fade-in">
+              <FeedInventory />
+            </div>
+          )}
+
+          {/* ── STAFF INCOME ── */}
+          {activeView === "staff-income" && (
+            <div className="space-y-6 animate-fade-in">
+              <StaffSalaryDashboard />
+            </div>
+          )}
+
+        </main>
+      </div>
+
+      {/* Medical card detail dialog (rendered outside view blocks so it persists across views) */}
+      {selectedCard && (
+        <Dialog open={!!selectedCard} onOpenChange={(open) => { if (!open) setSelectedCard(null); }}>
+          <DialogContent className="max-w-3xl max-h-[90vh] sm:max-h-[85vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>{t("moderator.card.modal.title", { id: selectedCard?.id })}</DialogTitle>
+              <DialogDescription>{t("moderator.card.modal.subtitle")}</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3 overflow-y-auto pr-1 sm:pr-2">
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">{t("moderator.card.modal.client")}</p>
+                  <p className="font-medium">{selectedCard?.client?.full_name ?? selectedCard?.client_name ?? selectedCard?.client ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t("moderator.card.modal.pet")}</p>
+                  <p className="font-medium">{selectedCard?.pet?.name ?? selectedCard?.pet_name ?? selectedCard?.pet ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t("moderator.card.modal.status")}</p>
+                  {(() => {
+                    const statusInfo = getPaymentStatus(selectedCard);
+                    return <Button size="sm" className={statusInfo.className} onClick={() => {}}>{statusInfo.label}</Button>;
+                  })()}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">{t("moderator.card.modal.total")}</p>
+                  <p className="font-semibold">{selectedCard?.total_fee ?? selectedCard?.total_amount ?? selectedCard?.total ?? "—"}</p>
+                </div>
+              </div>
+
+              {typeof selectedCard?.total_fee !== "undefined" && (
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div className="p-3 border rounded-lg bg-background">
+                    <p className="text-xs text-muted-foreground">{t("moderator.card.modal.paid")}</p>
+                    <p className="font-semibold">{selectedCard?.amount_paid ?? "0"}</p>
+                  </div>
+                  <div className="p-3 border rounded-lg bg-background">
+                    <p className="text-xs text-muted-foreground">{t("moderator.card.modal.outstanding")}</p>
+                    <p className="font-semibold">{selectedCard?.outstanding_fee ?? "0"}</p>
+                  </div>
+                  <div className="p-3 border rounded-lg bg-background flex flex-col justify-between">
+                    <p className="text-xs text-muted-foreground mb-1">{t("moderator.card.modal.progress")}</p>
+                    {(() => {
+                      const total = Number(selectedCard?.total_fee || selectedCard?.total_amount || 0);
+                      const paid = Number(selectedCard?.amount_paid || 0);
+                      const pct = total > 0 ? Math.min(100, Math.max(0, (paid / total) * 100)) : 0;
+                      return (
+                        <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
+                          <div className="h-2 bg-green-500 transition-all" style={{ width: `${pct}%` }} />
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+
+              {selectedCard?.anamnesis && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">{t("moderator.card.modal.anamnesis")}</p>
+                  <div className="border rounded p-2 bg-muted/30 whitespace-pre-wrap text-sm">{selectedCard.anamnesis}</div>
+                </div>
+              )}
+
+              {selectedCard?.recommended_feed_text && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">{t("moderator.card.modal.recommendedFeed")}</p>
+                  <div className="border rounded p-2 bg-muted/30 whitespace-pre-wrap text-sm">{selectedCard.recommended_feed_text}</div>
+                </div>
+              )}
+
+              <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="p-3 border rounded-lg bg-background">
+                  <p className="text-xs text-muted-foreground">{t("moderator.card.modal.feeTotal")}</p>
+                  <p className="font-semibold">{selectedCard?.total_fee ?? selectedCard?.total_amount ?? selectedCard?.total ?? "—"}</p>
+                </div>
+                <div className="p-3 border rounded-lg bg-background">
+                  <p className="text-xs text-muted-foreground">{t("moderator.card.modal.feeStationary")}</p>
+                  <p className="font-semibold">{selectedCard?.stationary_fee ?? selectedCard?.stationary_total ?? "—"}</p>
+                </div>
+                <div className="p-3 border rounded-lg bg-background">
+                  <p className="text-xs text-muted-foreground">{t("moderator.card.modal.feeMedicines")}</p>
+                  <p className="font-semibold">{selectedCard?.medicines_fee ?? selectedCard?.medicines_total ?? "—"}</p>
+                </div>
+                <div className="p-3 border rounded-lg bg-background">
+                  <p className="text-xs text-muted-foreground">{t("moderator.card.modal.feeServices")}</p>
+                  <p className="font-semibold">{selectedCard?.services_fee ?? selectedCard?.services_total ?? "—"}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold mb-2">{t("moderator.card.modal.servicesTitle")} ({cardServices.length})</p>
+                {itemsLoading ? (
+                  <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+                ) : cardServices.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t("doctor.edit.services.empty")}</p>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t("moderator.card.modal.servicesTable.service")}</TableHead>
+                          <TableHead>{t("moderator.card.modal.servicesTable.quantity")}</TableHead>
+                          <TableHead>{t("moderator.card.modal.servicesTable.price")}</TableHead>
+                          <TableHead>{t("moderator.card.modal.servicesTable.total")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cardServices.map((s: any, idx: number) => {
+                          const name = s?.service?.name ?? s?.services?.name ?? s?.service_name ?? s?.name ?? `#${s?.id ?? idx}`;
+                          const qty = s?.quantity ?? s?.qty ?? 1;
+                          const price = s?.price ?? s?.unit_price ?? 0;
+                          const total = Number(qty) * Number(price);
                           return (
-                            <button
-                              key={m}
-                              type="button"
-                              onClick={() => setPaymentMethod(m as any)}
-                              className={`flex flex-col items-center justify-center rounded-xl border p-3 transition hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                                isActive ? "border-primary bg-primary/5 shadow-sm" : "border-border"
-                              }`}
-                            >
-                              <img
-                                src={imgSrc}
-                                alt={label}
-                                className="h-13 w-13 object-contain"
-                              />
-                                <span className="mt-1 text-xs font-medium">{label}</span>
-                            </button>
+                            <TableRow key={`svc-${s?.id ?? idx}`}>
+                              <TableCell>{name}</TableCell>
+                              <TableCell>{qty}</TableCell>
+                              <TableCell>{price} сум</TableCell>
+                              <TableCell className="font-semibold">{total} сум</TableCell>
+                            </TableRow>
                           );
                         })}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="paymentNote">{t("moderator.card.modal.paymentNote")}</Label>
-                      <Input
-                        id="paymentNote"
-                        value={paymentNote}
-                        onChange={(e) => setPaymentNote(e.target.value)}
-                        placeholder={t("moderator.card.modal.paymentNotePlaceholder")}
-                      />
-                    </div>
+                      </TableBody>
+                    </Table>
                   </div>
+                )}
+              </div>
 
-                  <div className="flex justify-between gap-2 flex-wrap">
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setSelectedCard(null)}
-                      >
-                        {t("common.close")}
-                      </Button>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={confirmLoading || !selectedCard?.id}
-                        onClick={async () => {
-                          if (!selectedCard?.id) return;
-                          setConfirmLoading(true);
-                          try {
-                            await MedicalCards.confirmPayment(selectedCard.id, {
-                              method: paymentMethod || undefined,
-                              note: paymentNote || undefined,
-                            });
-                            toast({ title: t("common.confirmed") });
-                            await loadWaitingCards();
-                            if (selectedCard?.id) {
-                              const updated = await MedicalCards.get<any>(selectedCard.id);
-                              setSelectedCard(updated);
-                              await loadPayments(Number(updated.id));
-                            }
-                          } catch (e: any) {
-                            const msg = e?.response?.data || e?.message || t("common.error");
-                            toast({ variant: "destructive", title: t("common.error"), description: JSON.stringify(msg) });
-                          } finally {
-                            setConfirmLoading(false);
-                          }
-                        }}
-                        className="gap-2"
-                      >
-                        {confirmLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                        {t("moderator.card.modal.confirmFullPayment")}
-                      </Button>
-                      <Button
-                        type="button"
-                        disabled={paymentSubmitting || !selectedCard?.id}
-                        className="gap-2"
-                        onClick={async () => {
-                          if (!selectedCard?.id) return;
-                          const amountNum = Number(paymentAmount);
-                          const outstanding = Number(selectedCard?.outstanding_fee ?? selectedCard?.total_fee ?? 0) - Number(selectedCard?.amount_paid ?? 0);
-                          if (!paymentAmount || isNaN(amountNum) || amountNum <= 0) {
-                            toast({ variant: "destructive", title: t("moderator.card.modal.paymentValidation.amountRequired"), description: t("moderator.card.modal.paymentValidation.amountRequiredDesc") });
-                            return;
-                          }
-                          if (amountNum > outstanding && outstanding > 0) {
-                            toast({ variant: "destructive", title: t("moderator.card.modal.paymentValidation.amountExceeds"), description: `${t("moderator.card.modal.paymentValidation.amountExceeds")}: ${outstanding}` });
-                            return;
-                          }
-                          if (!paymentMethod) {
-                            toast({ variant: "destructive", title: t("moderator.card.modal.paymentValidation.methodRequired"), description: t("moderator.card.modal.paymentValidation.methodRequiredDesc") });
-                            return;
-                          }
-                          setPaymentSubmitting(true);
-                          try {
-                            const updated = await MedicalCards.receivePayment<any>(selectedCard.id, {
-                              amount: amountNum.toFixed(2),
-                              method: paymentMethod,
-                              note: paymentNote || undefined,
-                            });
-                            setSelectedCard(updated);
-                            await loadWaitingCards();
-                            await loadPayments(Number(updated.id));
-                            setPaymentAmount("");
-                            toast({ title: t("moderator.card.modal.paymentSuccess") });
-                          } catch (e: any) {
-                            const data = e?.response?.data;
-                            let msg = e?.message || t("common.error");
-                            if (data && typeof data === "object") {
-                              msg = Object.values(data as any).flat().join("; ");
-                            }
-                            toast({ variant: "destructive", title: t("moderator.card.modal.paymentError"), description: msg });
-                          } finally {
-                            setPaymentSubmitting(false);
-                          }
-                        }}
-                      >
-                        {paymentSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                        {t("moderator.card.modal.acceptPartialPayment")}
-                      </Button>
-                    </div>
+              <div>
+                <p className="text-sm font-semibold mb-2">{t("moderator.card.modal.medicinesTitle")} ({cardMedicines.length})</p>
+                {itemsLoading ? (
+                  <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+                ) : cardMedicines.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t("doctor.edit.medicines.empty")}</p>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t("moderator.card.modal.medicinesTable.medicine")}</TableHead>
+                          <TableHead>{t("moderator.card.modal.medicinesTable.quantity")}</TableHead>
+                          <TableHead>{t("moderator.card.modal.medicinesTable.price")}</TableHead>
+                          <TableHead>{t("moderator.card.modal.medicinesTable.total")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cardMedicines.map((m: any, idx: number) => {
+                          const name = m?.medicine?.name ?? m?.medicines?.name ?? m?.medicine_name ?? m?.name ?? `#${m?.id ?? idx}`;
+                          const qty = m?.quantity ?? m?.qty ?? 1;
+                          const price = m?.price ?? m?.unit_price ?? 0;
+                          const total = Number(qty) * Number(price);
+                          return (
+                            <TableRow key={`med-${m?.id ?? idx}`}>
+                              <TableCell>{name}</TableCell>
+                              <TableCell>{qty}</TableCell>
+                              <TableCell>{price} сум</TableCell>
+                              <TableCell className="font-semibold">{total} сум</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold mb-2">{t("moderator.card.modal.paymentsTitle")} ({payments.length})</p>
+                {paymentsLoading ? (
+                  <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
+                ) : payments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t("moderator.card.modal.paymentsEmpty")}</p>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t("moderator.card.modal.paymentsTable.date")}</TableHead>
+                          <TableHead>{t("moderator.card.modal.paymentsTable.method")}</TableHead>
+                          <TableHead>{t("moderator.card.modal.paymentsTable.amount")}</TableHead>
+                          <TableHead>{t("moderator.card.modal.paymentsTable.note")}</TableHead>
+                          <TableHead>{t("moderator.card.modal.paymentsTable.recordedBy")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {payments.map((p: any, idx: number) => (
+                          <TableRow key={p.id ?? idx}>
+                            <TableCell>{p.created_at ? new Date(p.created_at).toLocaleString("ru-RU") : "—"}</TableCell>
+                            <TableCell>{getPaymentMethodLabel(p.method)}</TableCell>
+                            <TableCell>{p.amount ?? "—"}</TableCell>
+                            <TableCell>{p.note ?? "—"}</TableCell>
+                            <TableCell>{p.recorded_by ?? "—"}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Payment actions */}
+            <div className="space-y-4 pt-4 border-t mt-4">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="paymentAmount">{t("moderator.card.modal.paymentAmount")}</Label>
+                  <Input
+                    id="paymentAmount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    placeholder={selectedCard?.outstanding_fee ?? "0"}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t("moderator.card.modal.paymentMethod")}</Label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {["CASH", "CARD", "TRANSFER"].map((m) => {
+                      const isActive = paymentMethod === m;
+                      const label = m === "CASH" ? t("moderator.card.modal.paymentMethod.cash") : m === "CARD" ? t("moderator.card.modal.paymentMethod.card") : t("moderator.card.modal.paymentMethod.transfer");
+                      const imgSrc = m === "CASH" ? cashImg : m === "CARD" ? cardImg : transferImg;
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setPaymentMethod(m as any)}
+                          className={`flex flex-col items-center justify-center rounded-xl border p-3 transition hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${isActive ? "border-primary bg-primary/5 shadow-sm" : "border-border"}`}
+                        >
+                          <img src={imgSrc} alt={label} className="h-13 w-13 object-contain" />
+                          <span className="mt-1 text-xs font-medium">{label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              </DialogContent>
-            </Dialog>
-          )}
-        </Tabs>
-      </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="paymentNote">{t("moderator.card.modal.paymentNote")}</Label>
+                  <Input id="paymentNote" value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} placeholder={t("moderator.card.modal.paymentNotePlaceholder")} />
+                </div>
+              </div>
+
+              <div className="flex justify-between gap-2 flex-wrap">
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => setSelectedCard(null)}>{t("common.close")}</Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={confirmLoading || !selectedCard?.id}
+                    onClick={async () => {
+                      if (!selectedCard?.id) return;
+                      setConfirmLoading(true);
+                      try {
+                        await MedicalCards.confirmPayment(selectedCard.id, { method: paymentMethod || undefined, note: paymentNote || undefined });
+                        toast({ title: t("common.confirmed") });
+                        await loadWaitingCards();
+                        if (selectedCard?.id) {
+                          const updated = await MedicalCards.get<any>(selectedCard.id);
+                          setSelectedCard(updated);
+                          await loadPayments(Number(updated.id));
+                        }
+                      } catch (e: any) {
+                        const msg = e?.response?.data || e?.message || t("common.error");
+                        toast({ variant: "destructive", title: t("common.error"), description: JSON.stringify(msg) });
+                      } finally {
+                        setConfirmLoading(false);
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    {confirmLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    {t("moderator.card.modal.confirmFullPayment")}
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={paymentSubmitting || !selectedCard?.id}
+                    className="gap-2"
+                    onClick={async () => {
+                      if (!selectedCard?.id) return;
+                      const amountNum = Number(paymentAmount);
+                      const outstanding = Number(selectedCard?.outstanding_fee ?? selectedCard?.total_fee ?? 0) - Number(selectedCard?.amount_paid ?? 0);
+                      if (!paymentAmount || isNaN(amountNum) || amountNum <= 0) {
+                        toast({ variant: "destructive", title: t("moderator.card.modal.paymentValidation.amountRequired"), description: t("moderator.card.modal.paymentValidation.amountRequiredDesc") });
+                        return;
+                      }
+                      if (amountNum > outstanding && outstanding > 0) {
+                        toast({ variant: "destructive", title: t("moderator.card.modal.paymentValidation.amountExceeds"), description: `${t("moderator.card.modal.paymentValidation.amountExceeds")}: ${outstanding}` });
+                        return;
+                      }
+                      if (!paymentMethod) {
+                        toast({ variant: "destructive", title: t("moderator.card.modal.paymentValidation.methodRequired"), description: t("moderator.card.modal.paymentValidation.methodRequiredDesc") });
+                        return;
+                      }
+                      setPaymentSubmitting(true);
+                      try {
+                        const updated = await MedicalCards.receivePayment<any>(selectedCard.id, { amount: amountNum.toFixed(2), method: paymentMethod, note: paymentNote || undefined });
+                        setSelectedCard(updated);
+                        await loadWaitingCards();
+                        await loadPayments(Number(updated.id));
+                        setPaymentAmount("");
+                        toast({ title: t("moderator.card.modal.paymentSuccess") });
+                      } catch (e: any) {
+                        const data = e?.response?.data;
+                        let msg = e?.message || t("common.error");
+                        if (data && typeof data === "object") { msg = Object.values(data as any).flat().join("; "); }
+                        toast({ variant: "destructive", title: t("moderator.card.modal.paymentError"), description: msg });
+                      } finally {
+                        setPaymentSubmitting(false);
+                      }
+                    }}
+                  >
+                    {paymentSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    {t("moderator.card.modal.acceptPartialPayment")}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
@@ -1551,41 +1385,30 @@ export default ModeratorDashboard;
 const AddClientForm = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
-  const [form, setForm] = useState({
-    phone_number: "",
-    password: "",
-    first_name: "",
-    last_name: "",
-  });
+  const [form, setForm] = useState({ phone_number: "", password: "", first_name: "", last_name: "" });
   const [submitting, setSubmitting] = useState(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [usedPhones, setUsedPhones] = useState<Set<string> | null>(null);
   const [checkingPhone, setCheckingPhone] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Basic regex for +998 XX XXX XX XX style numbers (at least country code + digits)
   const phoneRegex = /^\+?\d{9,15}$/;
 
-  // Load used phones once (and refreshable if needed) when form mounts
   useEffect(() => {
     let cancelled = false;
     const loadUsed = async () => {
       try {
         setCheckingPhone(true);
         const data = await Utils.usedPhones();
-        if (!cancelled) {
-          setUsedPhones(new Set(data.results || []));
-        }
+        if (!cancelled) { setUsedPhones(new Set(data.results || [])); }
       } catch {
-        // If this fails, we still allow registration; just skip uniqueness check
+        // If this fails, we still allow registration
       } finally {
         if (!cancelled) setCheckingPhone(false);
       }
     };
     void loadUsed();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const validatePhone = (value: string) => {
@@ -1613,17 +1436,13 @@ const AddClientForm = () => {
     }
     setSubmitting(true);
     try {
-      const payload: Record<string, unknown> = {
-        phone_number: form.phone_number,
-        password: form.password,
-        role: "CLIENT",
-      };
+      const payload: Record<string, unknown> = { phone_number: form.phone_number, password: form.password, role: "CLIENT" };
       if (form.first_name) payload.first_name = form.first_name;
       if (form.last_name) payload.last_name = form.last_name;
       const created = await Clients.create<any>(payload);
       toast({ title: t("moderator.addUser.success"), description: `ID: ${created?.id ?? "—"}` });
-  setForm({ phone_number: "", password: "", first_name: "", last_name: "" });
-  setPhoneError(null);
+      setForm({ phone_number: "", password: "", first_name: "", last_name: "" });
+      setPhoneError(null);
     } catch (e: any) {
       const msg = e?.response?.data?.detail || e?.message || t("moderator.addUser.errorDesc");
       toast({ variant: "destructive", title: t("moderator.addUser.error"), description: String(msg) });
@@ -1642,20 +1461,12 @@ const AddClientForm = () => {
               id="phone_number"
               placeholder={t("moderator.addUser.phonePlaceholder")}
               value={form.phone_number}
-              onChange={(e) => {
-                const value = e.target.value;
-                setForm((s) => ({ ...s, phone_number: value }));
-                if (value) validatePhone(value);
-              }}
+              onChange={(e) => { const value = e.target.value; setForm((s) => ({ ...s, phone_number: value })); if (value) validatePhone(value); }}
               className={phoneError ? "border-red-500 focus-visible:ring-red-500" : undefined}
               required
             />
-            {checkingPhone && !usedPhones && (
-              <p className="text-xs text-muted-foreground">{t("moderator.addUser.checkingPhone")}</p>
-            )}
-            {phoneError && (
-              <p className="text-xs text-red-500">{phoneError}</p>
-            )}
+            {checkingPhone && !usedPhones && <p className="text-xs text-muted-foreground">{t("moderator.addUser.checkingPhone")}</p>}
+            {phoneError && <p className="text-xs text-red-500">{phoneError}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">{t("moderator.addUser.password")}</Label>
@@ -1683,19 +1494,11 @@ const AddClientForm = () => {
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="first_name">{t("moderator.addUser.firstName")}</Label>
-            <Input
-              id="first_name"
-              value={form.first_name}
-              onChange={(e) => setForm((s) => ({ ...s, first_name: e.target.value }))}
-            />
+            <Input id="first_name" value={form.first_name} onChange={(e) => setForm((s) => ({ ...s, first_name: e.target.value }))} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="last_name">{t("moderator.addUser.lastName")}</Label>
-            <Input
-              id="last_name"
-              value={form.last_name}
-              onChange={(e) => setForm((s) => ({ ...s, last_name: e.target.value }))}
-            />
+            <Input id="last_name" value={form.last_name} onChange={(e) => setForm((s) => ({ ...s, last_name: e.target.value }))} />
           </div>
         </div>
         <div className="flex gap-2">

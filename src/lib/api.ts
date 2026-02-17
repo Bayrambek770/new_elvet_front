@@ -279,28 +279,38 @@ export const Payments = {
 };
 
 // Salary API - includes staff summary for moderators and individual history
+export type StaffSalaryEntry = {
+  user_id: number;
+  name: string;
+  role: "DOCTOR" | "NURSE" | string;
+  amount: string;
+  is_disbursed: boolean;
+  daily_salary_id: number | null;
+};
+
 export type StaffSalarySummary = {
   date: string;
-  staff_salaries: Array<{
-    user_id: number;
-    name: string;
-    role: "DOCTOR" | "NURSE" | string;
-    amount: string;
-  }>;
+  staff_salaries: StaffSalaryEntry[];
 };
 
 export const Salary = {
-  // Moderators/Admins only - daily summary of all staff salaries
-  dailyStaffSummary: async <T = StaffSalarySummary>() => 
-    (await api.get<T>("salary/daily/staff-summary/")).data,
-  
+  // Moderators/Admins only - daily summary of all staff salaries; optional date param (YYYY-MM-DD)
+  dailyStaffSummary: async <T = StaffSalarySummary>(date?: string) => {
+    const params = date ? { date } : undefined;
+    return (await api.get<T>("salary/daily/staff-summary/", { params })).data;
+  },
+
+  // Moderators/Admins only - mark a staff member's salary as disbursed
+  disburse: async (userId: ID, date?: string) =>
+    (await api.post(`salary/daily/${userId}/pay/`, date ? { date } : {})).data,
+
   // Individual salary history (user can view their own, moderators/admins can view anyone's)
   history: {
-    daily: async <T = any>(userId: ID) => 
+    daily: async <T = any>(userId: ID) =>
       (await api.get<T>(`salary/history/${userId}/daily/`)).data,
-    weekly: async <T = any>(userId: ID) => 
+    weekly: async <T = any>(userId: ID) =>
       (await api.get<T>(`salary/history/${userId}/weekly/`)).data,
-    monthly: async <T = any>(userId: ID) => 
+    monthly: async <T = any>(userId: ID) =>
       (await api.get<T>(`salary/history/${userId}/monthly/`)).data,
   },
 };
@@ -404,6 +414,6 @@ export const NurseCareCards = {
     (await api.patch<T>(`nurse-care-cards/${id}/info/`, body)).data,
   recordPayment: async <T = NurseCareCard>(
     id: ID,
-    body: { amount_paid: string; method: "CASH" | "CLICK" | "PAYME" | "OTHER" }
+    body: { amount_paid: string; method: "CASH" | "CARD" | "TRANSFER" }
   ) => (await api.patch<T>(`nurse-care-cards/${id}/payment/`, body)).data,
 };
