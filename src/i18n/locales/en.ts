@@ -696,7 +696,9 @@ export const en = {
   "client.hero.fallbackRole": "Client",
   "client.dashboard.welcomeSubtitle": "Manage your pets' health in one place",
   "client.logout.goodbye": "Goodbye!",
-  
+  "client.revisit.reminder": "Tomorrow you should visit ELVET — doctor has scheduled a revisit for {{petName}} on {{date}}.",
+  "client.revisit.dismiss": "Dismiss",
+
   // Common extra
   "common.goodbye": "Goodbye!",
 

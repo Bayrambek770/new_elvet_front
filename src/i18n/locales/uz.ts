@@ -696,7 +696,9 @@ export const uz = {
   "client.hero.fallbackRole": "Mijoz",
   "client.dashboard.welcomeSubtitle": "Uy hayvonlaringiz salomatligini bir joyda boshqaring",
   "client.logout.goodbye": "Xayr!",
-  
+  "client.revisit.reminder": "Ertaga ELVET'ga tashrif buyurishingiz kerak — shifokor {{petName}} uchun qayta ko'rikni {{date}} sanasiga belgiladi.",
+  "client.revisit.dismiss": "Yopish",
+
   // Common extra
   "common.goodbye": "Xayr!",
 

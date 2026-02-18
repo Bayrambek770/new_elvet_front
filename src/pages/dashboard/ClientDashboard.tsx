@@ -4,16 +4,26 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LogOut, PawPrint, FileText, User } from "lucide-react";
+import { LogOut, PawPrint, FileText, User, Bell, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { PetsManager } from "@/components/client/PetsManager";
 import { AppointmentsManager } from "@/components/client/AppointmentsManager";
 import { HistoryCardsViewer } from "@/components/client/HistoryCardsViewer"; // Changed from MedicalCardsViewer and NurseCareCardsViewer
 import { ProfileEditor } from "@/components/client/ProfileEditor";
-import { useMe } from "@/hooks/api";
+import { useMe, useRevisitReminder } from "@/hooks/api";
 import { tokenStore } from "@/lib/apiClient";
 import elvetLogo from "@/assets/elvet_logo.jpg";
+
+const DISMISSED_KEY = "dismissed_revisit_reminders";
+
+const getDismissed = (): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem(DISMISSED_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
@@ -22,6 +32,27 @@ const ClientDashboard = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
   const { data: me, isLoading: loading } = useMe();
+  const { data: revisitReminders = [] } = useRevisitReminder();
+
+  // IDs of banners dismissed this session (backed by localStorage)
+  const [dismissed, setDismissed] = useState<string[]>(getDismissed);
+
+  const dismissReminder = (id: number, revisitDate: string) => {
+    const key = `${id}_${revisitDate}`;
+    const next = [...dismissed, key];
+    setDismissed(next);
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify(next));
+  };
+
+  const activeReminders = revisitReminders.filter(
+    (r) => !dismissed.includes(`${r.id}_${r.revisit_date}`)
+  );
+
+  const formatRevisitDate = (iso: string) => {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return new Intl.DateTimeFormat(undefined, { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(d);
+  };
 
   useEffect(() => {
     if (!isPublic && !loading && !me) {
@@ -112,6 +143,30 @@ const ClientDashboard = () => {
             </div>
           </div>
         </Card>
+
+        {/* Revisit Reminder Banners */}
+        {activeReminders.map((reminder) => (
+          <div
+            key={`${reminder.id}_${reminder.revisit_date}`}
+            className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 shadow-sm animate-fade-in"
+          >
+            <Bell className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+            <p className="flex-1 text-sm text-amber-900 font-medium">
+              {t("client.revisit.reminder", {
+                petName: reminder.pet_name || t("client.medicalCards.petFallback"),
+                date: formatRevisitDate(reminder.revisit_date),
+              })}
+            </p>
+            <button
+              type="button"
+              onClick={() => dismissReminder(reminder.id, reminder.revisit_date)}
+              aria-label={t("client.revisit.dismiss")}
+              className="text-amber-500 hover:text-amber-700 flex-shrink-0 mt-0.5"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
 
         {/* Enhanced Tabs */}
         <Tabs defaultValue="pets" className="space-y-5">

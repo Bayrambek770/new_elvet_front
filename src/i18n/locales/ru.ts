@@ -697,7 +697,9 @@ export const ru = {
   "client.hero.fallbackRole": "Клиент",
   "client.dashboard.welcomeSubtitle": "Управляйте здоровьем ваших питомцев в одном месте",
   "client.logout.goodbye": "До свидания!",
-  
+  "client.revisit.reminder": "Завтра вам нужно посетить ELVET — врач назначил повторный приём для {{petName}} на {{date}}.",
+  "client.revisit.dismiss": "Закрыть",
+
   // Common extra
   "common.goodbye": "До свидания!",
 

@@ -167,6 +167,14 @@ export const useNurseCareClient = () =>
     queryFn: async () => NurseCareCards.client(),
   });
 
+export const useRevisitReminder = () =>
+  useQuery({
+    queryKey: ["revisitReminder"],
+    queryFn: () => MedicalCards.revisitTomorrow(),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+
 export const useCreateNurseCareCard = () =>
   useMutation({
     mutationFn: (payload: { nurse: number | string; client: number | string; pet: number | string; description?: string; service_ids?: Array<number | string>; created_by?: number | string }) =>

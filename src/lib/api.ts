@@ -116,6 +116,10 @@ export const MedicalCards = {
     const { data } = await api.get<T>("medical-cards/partly-paid/");
     return data;
   },
+  revisitTomorrow: async () => {
+    const { data } = await api.get<Array<{ id: number; revisit_date: string; pet_name: string | null }>>("medical-cards/revisit-tomorrow/");
+    return data;
+  },
   attachments: {
     list: async <T = any>(cardId: ID) => {
       const { data } = await api.get<T | T[]>(`medical-cards/${cardId}/attachments/`);
