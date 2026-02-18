@@ -381,6 +381,32 @@ export const HistoryCardsViewer = ({ userId }: { userId: string | number }) => {
                     </div>
                   </div>
 
+                  {/* Medical Card Payment Breakdown (PARTLY_PAID only) */}
+                  {isMedical && getStatus(card) === "PARTLY_PAID" && (() => {
+                    const d = detailsByCard[card.id];
+                    const total = Number(d?.total_fee ?? card.total_fee ?? card.total_amount ?? 0);
+                    const paid = Number(d?.amount_paid ?? card.amount_paid ?? 0);
+                    const remaining = Number(d?.outstanding_fee ?? Math.max(0, total - paid));
+                    return (
+                      <div className="mt-3 p-3 rounded-lg bg-blue-50 border border-blue-200 space-y-1">
+                        <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-blue-900">
+                          <div>
+                            <span className="block text-blue-500 font-normal mb-0.5">{t("client.nurseCare.total")}</span>
+                            {formatSum(total)} {t("client.medicalCards.currency.sum").toUpperCase()}
+                          </div>
+                          <div>
+                            <span className="block text-blue-500 font-normal mb-0.5">{t("client.nurseCare.paid")}</span>
+                            {formatSum(paid)} {t("client.medicalCards.currency.sum").toUpperCase()}
+                          </div>
+                          <div>
+                            <span className="block text-orange-500 font-normal mb-0.5">{t("client.nurseCare.remain")}</span>
+                            <span className="text-orange-700">{formatSum(remaining)} {t("client.medicalCards.currency.sum").toUpperCase()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Nurse Care Quick Info */}
                   {!isMedical && (
                     <div className="mt-3 p-3 rounded-lg bg-muted/30 space-y-2">

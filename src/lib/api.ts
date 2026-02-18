@@ -259,6 +259,13 @@ export const Tasks = {
   patch: <T = unknown>(id: ID, body: Record<string, unknown>) => patch<T>("tasks/", id, body),
   remove: (id: ID) => del("tasks/", id),
   
+  // Nurse creates task from medical card
+  createFromMedicalCard: async <T = unknown>(body: {
+    medical_card: ID;
+    service: ID;
+    datetime?: string;
+  }) => (await api.post<T>("tasks/create-from-medical-card/", body)).data,
+  
   // Nurse-specific task endpoints (optional - may use payment-transactions paths per API guide)
   getToDoByNurseId: async <T = any>(nurseId: ID) => 
     (await api.get<T>(`payment-transactions/to-do/by_id/${nurseId}/`)).data,

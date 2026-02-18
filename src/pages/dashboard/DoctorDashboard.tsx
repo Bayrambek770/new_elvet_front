@@ -1139,14 +1139,6 @@ const DoctorDashboard = () => {
 
     setCreateCardDialogOpen(false);
   	toast({ title: t('doctor.create.successTitle'), description: t('doctor.create.successDescription', { id: cardId }) });
-
-    // Open schedule/task modal right after card creation
-    setScheduleForCardId(cardId);
-    setScheduleId(null);
-    setScheduleTasks([]);
-    setScheduleError(null);
-    setScheduleDateTime(revisitDate ? `${revisitDate}T09:00` : "");
-    setScheduleDialogOpen(true);
     resetCreateCardForm();
   };
 
@@ -2563,7 +2555,10 @@ const DoctorDashboard = () => {
               </DialogContent>
             </Dialog>
 
-            {/* Schedule Builder Modal (opens after saving when stationary) */}
+            {/* 
+              Schedule Builder Modal REMOVED - Doctors no longer create tasks for nurses.
+              Nurses now create their own tasks directly from medical cards.
+              
             <Dialog open={scheduleDialogOpen} onOpenChange={(open) => {
               if (!open && scheduleSaving) return;
               setScheduleDialogOpen(open);
@@ -2601,6 +2596,7 @@ const DoctorDashboard = () => {
                 </div>
               </DialogContent>
             </Dialog>
+            */}
     </div>
   );
 

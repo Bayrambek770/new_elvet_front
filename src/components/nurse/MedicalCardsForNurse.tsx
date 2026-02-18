@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { TaskCreationModal } from "./TaskCreationModal";
+import { TaskCreationFromCardModal } from "./TaskCreationFromCardModal";
 
 type MedicalCard = {
   id: number;
@@ -218,8 +218,8 @@ export const MedicalCardsForNurse = () => {
             </Select>
           </div>
 
-          {/* Cards Table */}
-          <div className="rounded-lg border overflow-x-auto">
+          {/* Cards Grid */}
+          <div className="space-y-4">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -230,43 +230,93 @@ export const MedicalCardsForNurse = () => {
                 <p>{cards.length === 0 ? "No medical cards found" : "No cards match your filters"}</p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Pet</TableHead>
-                    <TableHead>Diagnosis</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCards.map((card) => (
-                    <TableRow key={card.id} className="cursor-pointer hover:bg-muted/40" onClick={() => handleViewCard(card)}>
-                      <TableCell className="font-medium">#{card.id}</TableCell>
-                      <TableCell>{getClientName(card)}</TableCell>
-                      <TableCell>{getPetName(card)}</TableCell>
-                      <TableCell>{card.diagnosis || "—"}</TableCell>
-                      <TableCell>{card.total_fee || "—"}</TableCell>
-                      <TableCell>{getStatusBadge(card.status)}</TableCell>
-                      <TableCell className="text-right">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredCards.map((card) => (
+                  <Card key={card.id} className="hover:shadow-lg transition-shadow border-2">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-lg">Card #{card.id}</CardTitle>
+                            {getStatusBadge(card.status)}
+                          </div>
+                          <CardDescription className="text-xs text-muted-foreground">
+                            {card.created_at ? new Date(card.created_at).toLocaleDateString() : "—"}
+                          </CardDescription>
+                        </div>
+                      </div>
+                      
+                      {/* Names Grid */}
+                      <div className="space-y-2">
+                        <div className="rounded-lg bg-primary/5 p-2.5">
+                          <p className="text-xs text-muted-foreground">Pet Name</p>
+                          <p className="text-sm font-semibold mt-0.5">{getPetName(card)}</p>
+                        </div>
+                        <div className="rounded-lg bg-primary/5 p-2.5">
+                          <p className="text-xs text-muted-foreground">Client Name</p>
+                          <p className="text-sm font-semibold mt-0.5">{getClientName(card)}</p>
+                        </div>
+                        <div className="rounded-lg bg-primary/5 p-2.5">
+                          <p className="text-xs text-muted-foreground">Assigned Nurse</p>
+                          <p className="text-sm font-semibold mt-0.5">{getAssignedNurseName(card)}</p>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent className="space-y-3">
+                      {/* Diagnosis */}
+                      {card.diagnosis && (
+                        <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-3">
+                          <p className="text-xs text-muted-foreground mb-1">Diagnosis</p>
+                          <p className="text-sm font-medium">{card.diagnosis}</p>
+                        </div>
+                      )}
+                      
+                      {/* Services and Medicines Count */}
+                      <div className="flex gap-3 text-xs">
+                        {card.service_usages && card.service_usages.length > 0 && (
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>{card.service_usages.length} service(s)</span>
+                          </div>
+                        )}
+                        {card.medicine_usages && card.medicine_usages.length > 0 && (
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <PlusCircle className="w-3.5 h-3.5" />
+                            <span>{card.medicine_usages.length} medicine(s)</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 pt-1">
                         <Button
-                          variant="ghost"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewCard(card)}
+                          className="flex-1"
+                        >
+                          <FileText className="w-4 h-4 mr-2" />
+                          Details
+                        </Button>
+                        <Button
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleViewCard(card);
+                            setSelectedCard(card);
+                            setTaskModalOpen(true);
                           }}
+                          className="flex-1 gap-2"
+                          disabled={!card.service_usages || card.service_usages.length === 0}
                         >
-                          View
+                          <PlusCircle className="w-4 h-4" />
+                          Create Task
                         </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             )}
           </div>
         </CardContent>
@@ -325,37 +375,43 @@ export const MedicalCardsForNurse = () => {
                 {!selectedCard.service_usages || selectedCard.service_usages.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No services prescribed</p>
                 ) : (
-                  <div className="rounded-lg border overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Service</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead className="text-right">Quantity</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedCard.service_usages.map((usage: any, idx: number) => (
-                          <TableRow key={idx}>
-                            <TableCell className="font-medium">
-                              {usage.service_name || usage.service?.name || usage.service || "—"}
-                            </TableCell>
-                            <TableCell>{usage.description || "—"}</TableCell>
-                            <TableCell className="text-right">{usage.quantity || 1}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                  <div className="space-y-2">
+                    {selectedCard.service_usages.map((usage: any, idx: number) => (
+                      <div key={idx} className="rounded-lg border p-3 bg-muted/20">
+                        <p className="font-medium">
+                          {usage.service_name || usage.service?.name || usage.service || "—"}
+                        </p>
+                        {usage.description && (
+                          <p className="text-sm text-muted-foreground mt-1">{usage.description}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">Quantity: {usage.quantity || 1}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
 
-              {/* Create Task Button */}
-              {selectedCard.service_usages && selectedCard.service_usages.length > 0 && (
-                <Button onClick={handleCreateTask} className="w-full gap-2">
-                  <PlusCircle className="w-4 h-4" />
-                  Create Task from this Card
-                </Button>
+              {/* Medicines */}
+              {selectedCard.medicine_usages && selectedCard.medicine_usages.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    Prescribed Medicines
+                    <Badge variant="outline">{selectedCard.medicine_usages.length}</Badge>
+                  </h3>
+                  <div className="space-y-2">
+                    {selectedCard.medicine_usages.map((usage: any, idx: number) => (
+                      <div key={idx} className="rounded-lg border p-3 bg-muted/20">
+                        <p className="font-medium">
+                          {usage.name || "—"}
+                        </p>
+                        {usage.dosage && (
+                          <p className="text-sm text-muted-foreground mt-1">Dosage: {usage.dosage}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">Quantity: {usage.quantity || 1}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -364,7 +420,7 @@ export const MedicalCardsForNurse = () => {
 
       {/* Task Creation Modal */}
       {selectedCard && (
-        <TaskCreationModal
+        <TaskCreationFromCardModal
           open={taskModalOpen}
           onOpenChange={setTaskModalOpen}
           medicalCard={selectedCard}

@@ -11,6 +11,7 @@ import {
   NurseCareCards,
   PetFeeds,
   FeedSales,
+  Tasks,
   type MeResponse,
 } from "@/lib/api";
 import { api, tokenStore } from "@/lib/apiClient";
@@ -231,6 +232,21 @@ export const usePayFeedSale = () => {
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: ["feed-sales"] });
       qc.invalidateQueries({ queryKey: ["feed-sales", id] });
+    },
+  });
+};
+
+export const useCreateTaskFromMedicalCard = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      medical_card: number | string;
+      service: number | string;
+      datetime?: string;
+    }) => Tasks.createFromMedicalCard(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["medical-cards"] });
     },
   });
 };
