@@ -473,11 +473,11 @@ export const HistoryCardsViewer = ({ userId }: { userId: string | number }) => {
                                 })()}
                               </div>
 
-                              {/* Prescriptions */}
+                              {/* Medicines */}
                               <div>
                                 <div className="flex items-center gap-2 text-sm font-semibold mb-2">
                                   <Pill className="w-4 h-4 text-primary" />
-                                  {t("client.medicalCards.prescriptions")}
+                                  {t("client.medicalCards.medicines")}
                                 </div>
                                 {detailsByCard[card.id]?.medicine_usages && detailsByCard[card.id].medicine_usages.length > 0 ? (
                                   <ul className="text-sm space-y-1 ml-6">
@@ -488,8 +488,19 @@ export const HistoryCardsViewer = ({ userId }: { userId: string | number }) => {
                                     ))}
                                   </ul>
                                 ) : (
-                                  <div className="text-sm text-muted-foreground ml-6">{t("client.medicalCards.prescriptions.empty")}</div>
+                                  <div className="text-sm text-muted-foreground ml-6">{t("client.medicalCards.medicines.empty")}</div>
                                 )}
+                              </div>
+
+                              {/* Naznacheniya (Doctor's prescription text) */}
+                              <div>
+                                <div className="flex items-center gap-2 text-sm font-semibold mb-2">
+                                  <FileText className="w-4 h-4 text-primary" />
+                                  {t("client.medicalCards.naznacheniya")}
+                                </div>
+                                <div className="rounded-md border bg-muted/50 p-3 text-sm whitespace-pre-wrap ml-6">
+                                  {detailsByCard[card.id]?.naznacheniya || t("client.medicalCards.naznacheniya.empty")}
+                                </div>
                               </div>
 
                               {/* Stationary Room Payment */}

@@ -124,7 +124,7 @@ const DoctorDashboard = () => {
     service_usages?: any[];
     analyze?: string;
     general_condition?: string;
-    chest_condition?: string;
+
     notes?: string;
     revisit_date?: string | null;
     recommended_feed_text?: string | null;
@@ -202,11 +202,9 @@ const DoctorDashboard = () => {
 
   // Create Medical Card modal state
   const [createCardDialogOpen, setCreateCardDialogOpen] = useState(false);
-  const [weight, setWeight] = useState("");
-  const [temperature, setTemperature] = useState("");
-  const [symptoms, setSymptoms] = useState("");
-  const [diagnosis, setDiagnosis] = useState("");
-  const [analyses, setAnalyses] = useState("");
+  const [generalCondition, setGeneralCondition] = useState("");
+  const [anamnez, setAnamnez] = useState("");
+  const [naznacheniya, setNaznacheniya] = useState("");
   const [revisitDate, setRevisitDate] = useState("");
   const [recommendedFeedText, setRecommendedFeedText] = useState("");
   const [isStationary, setIsStationary] = useState(false);
@@ -217,14 +215,8 @@ const DoctorDashboard = () => {
   const [stationaryReleaseDate, setStationaryReleaseDate] = useState("");
   const [hourlyStartDateTime, setHourlyStartDateTime] = useState("");
   const [hourlyEndDateTime, setHourlyEndDateTime] = useState("");
-  // Required vitals & selections
+  // Selections inside create card modal
   const [selectedPetId, setSelectedPetId] = useState<number | null>(null);
-  const [bloodPressure, setBloodPressure] = useState("");
-  const [mucousMembrane, setMucousMembrane] = useState("");
-  const [heartRate, setHeartRate] = useState("");
-  const [respiratoryRate, setRespiratoryRate] = useState("");
-  const [chestCondition, setChestCondition] = useState("");
-  const [notes, setNotes] = useState("");
   // Selections inside create card modal
   const [selectedServices, setSelectedServices] = useState<Record<number, ServiceSelection>>({});
   const [selectedMedicines, setSelectedMedicines] = useState<Record<number, MedicineSelection>>({});
@@ -234,6 +226,15 @@ const DoctorDashboard = () => {
   const [formNurses, setFormNurses] = useState<ApiNurse[]>([]);
   const [formNursesLoading, setFormNursesLoading] = useState(false);
   const [formNursesError, setFormNursesError] = useState<string | null>(null);
+
+  // Vital signs for create card modal
+  const [weight, setWeight] = useState("");
+  const [temperature, setTemperature] = useState("");
+  const [bloodPressure, setBloodPressure] = useState("");
+  const [mucousMembrane, setMucousMembrane] = useState("");
+  const [heartRate, setHeartRate] = useState("");
+  const [respiratoryRate, setRespiratoryRate] = useState("");
+  const [chestCondition, setChestCondition] = useState("");
 
   // Pets list for client
   const [petsList, setPetsList] = useState<ApiPet[]>([]);
@@ -296,11 +297,9 @@ const DoctorDashboard = () => {
   const [editCardSaving, setEditCardSaving] = useState(false);
   const [editCardId, setEditCardId] = useState<number | null>(null);
   const [editOriginal, setEditOriginal] = useState<ApiMedicalCard | null>(null);
-  const [editDiagnosis, setEditDiagnosis] = useState("");
-  const [editAnalyses, setEditAnalyses] = useState("");
-  const [editSymptoms, setEditSymptoms] = useState("");
-  const [editChest, setEditChest] = useState("");
-  const [editNotes, setEditNotes] = useState("");
+  const [editGeneralCondition, setEditGeneralCondition] = useState("");
+  const [editAnamnez, setEditAnamnez] = useState("");
+  const [editNaznacheniya, setEditNaznacheniya] = useState("");
   const [editRevisit, setEditRevisit] = useState("");
   const [editRecommendedFeedText, setEditRecommendedFeedText] = useState("");
   const [editIsStationary, setEditIsStationary] = useState(false);
@@ -364,11 +363,9 @@ const DoctorDashboard = () => {
       const { data } = await api.get(`medical-cards/${id}/`);
       const card = data as ApiMedicalCard & { attachments?: ApiMedicalCardAttachment[] };
       setEditOriginal(card);
-      setEditDiagnosis(card.diagnosis || "");
-      setEditAnalyses(card.analyze || "");
-      setEditSymptoms(card.general_condition || "");
-      setEditChest(card.chest_condition || "");
-      setEditNotes(card.notes || "");
+      setEditGeneralCondition(card.general_condition || "");
+      setEditAnamnez((card as any).anamnez || "");
+      setEditNaznacheniya((card as any).naznacheniya || "");
       setEditRevisit(card.revisit_date ? (card.revisit_date as string).slice(0,10) : "");
       setEditRecommendedFeedText(card.recommended_feed_text || "");
       setEditAttachments(card.attachments || []);
@@ -378,10 +375,10 @@ const DoctorDashboard = () => {
       setEditBookingType((card.booking_type as any) || "DAILY");
       setEditStationaryRoom(card.stationary_room ? String(card.stationary_room) : "");
       setEditStayStart(card.stay_start ? String(card.stay_start).slice(0,10) : "");
-    	setEditStayEnd(card.stay_end ? String(card.stay_end).slice(0,10) : "");
-    	setEditHourlyStart(card.hourly_start ? String(card.hourly_start).slice(0,16) : "");
-    	setEditHourlyEnd(card.hourly_end ? String(card.hourly_end).slice(0,16) : "");
-    	setEditStationaryRoomLabel(card.stationary_room ? t('doctor.room.fallback', { id: card.stationary_room }) : "");
+      setEditStayEnd(card.stay_end ? String(card.stay_end).slice(0,10) : "");
+      setEditHourlyStart(card.hourly_start ? String(card.hourly_start).slice(0,16) : "");
+      setEditHourlyEnd(card.hourly_end ? String(card.hourly_end).slice(0,16) : "");
+      setEditStationaryRoomLabel(card.stationary_room ? t('doctor.room.fallback', { id: card.stationary_room }) : "");
       // Load usages and catalogs in parallel
       setEditUsagesLoading(true); setEditUsagesError(null);
       Promise.all([
@@ -419,11 +416,9 @@ const DoctorDashboard = () => {
   const saveEditCard = async () => {
     if (!editCardId || !editOriginal) return;
     const patch: any = {};
-    if ((editDiagnosis || '') !== (editOriginal.diagnosis || '')) patch.diagnosis = editDiagnosis.trim();
-    if ((editAnalyses || '') !== (editOriginal.analyze || '')) patch.analyze = editAnalyses.trim();
-    if ((editSymptoms || '') !== (editOriginal.general_condition || '')) patch.general_condition = editSymptoms.trim();
-    if ((editChest || '') !== (editOriginal.chest_condition || '')) patch.chest_condition = editChest.trim();
-    if ((editNotes || '') !== (editOriginal.notes || '')) patch.notes = editNotes.trim();
+    if ((editGeneralCondition || '') !== (editOriginal.general_condition || '')) patch.general_condition = editGeneralCondition.trim();
+    if ((editAnamnez || '') !== ((editOriginal as any).anamnez || '')) patch.anamnez = editAnamnez.trim();
+    if ((editNaznacheniya || '') !== ((editOriginal as any).naznacheniya || '')) patch.naznacheniya = editNaznacheniya.trim();
     if ((editRecommendedFeedText || '') !== (editOriginal.recommended_feed_text || '')) {
       patch.recommended_feed_text = editRecommendedFeedText.trim();
     }
@@ -616,7 +611,7 @@ const DoctorDashboard = () => {
         }
       }
 
-  toast({ title: t('doctor.edit.saveSuccess') });
+      toast({ title: t('doctor.edit.saveSuccess') });
       setEditCardDialogOpen(false);
       // refresh doctor cards list
       if (me?.id) {
@@ -631,7 +626,7 @@ const DoctorDashboard = () => {
         } catch {}
       }
     } catch (e:any) {
-  toast({ title: t('doctor.edit.saveError'), description: e?.message, variant: 'destructive' });
+      toast({ title: t('doctor.edit.saveError'), description: e?.message, variant: 'destructive' });
     } finally {
       setEditCardSaving(false);
     }
@@ -853,7 +848,7 @@ const DoctorDashboard = () => {
         else if (typeof data === 'object') cards = [data as ApiMedicalCard];
       }
       setClientMedicalCards(cards);
-  }).catch(() => setClientMedicalCardsError(t('doctor.clientCards.loadError'))).finally(() => setClientMedicalCardsLoading(false));
+    }).catch(() => setClientMedicalCardsError(t('doctor.clientCards.loadError'))).finally(() => setClientMedicalCardsLoading(false));
   };
   const closeClientProfile = () => {
     setClientDialogOpen(false);
@@ -864,13 +859,13 @@ const DoctorDashboard = () => {
   };
 
   const resetCreateCardForm = () => {
-  setWeight(""); setTemperature("");
-    setSymptoms(""); setDiagnosis(""); setAnalyses(""); setRevisitDate(""); setRecommendedFeedText("");
-  setIsStationary(false); setStationaryRoom(""); setStationaryRoomLabel(""); setStationaryStartDate(""); setStationaryReleaseDate("");
-  setFreeRoomsData([]); setFreeRoomsError(null);
+    setWeight(""); setTemperature("");
+    setAnamnez(""); setNaznacheniya(""); setRevisitDate(""); setRecommendedFeedText("");
+    setIsStationary(false); setStationaryRoom(""); setStationaryRoomLabel(""); setStationaryStartDate(""); setStationaryReleaseDate("");
+    setFreeRoomsData([]); setFreeRoomsError(null);
     setSelectedServices({}); setSelectedMedicines({}); setSelectedFeeds({});
     setFormSearchService(""); setFormSearchMedicine(""); setFormSearchFeed("");
-    setSelectedPetId(null); setBloodPressure(""); setMucousMembrane(""); setHeartRate(""); setRespiratoryRate(""); setChestCondition(""); setNotes("");
+    setSelectedPetId(null); setBloodPressure(""); setMucousMembrane(""); setHeartRate(""); setRespiratoryRate(""); setChestCondition("");
     setShowPetCreateForm(false); setNewPetName(""); setNewPetSpecies(null); setNewPetGender(null); setNewPetBreed(""); setNewPetBirthDate(""); setNewPetColor(""); setNewPetWeight(""); setNewPetDescription(""); setPetCreateError(null);
     setAssignedNurseId(null); setFormNursesError(null);
   };
@@ -889,7 +884,7 @@ const DoctorDashboard = () => {
           if (results.length === 0) {
             setShowPetCreateForm(true);
           }
-  }).catch(() => setPetsError(t('doctor.pet.loadError'))).finally(() => setPetsLoading(false));
+        }).catch(() => setPetsError(t('doctor.pet.loadError'))).finally(() => setPetsLoading(false));
       }
       // Load nurses for assignment
       setFormNursesLoading(true); setFormNursesError(null);
@@ -988,25 +983,9 @@ const DoctorDashboard = () => {
     if (!selectedClient) { toast({ title: t('doctor.create.validation.selectClient'), variant: "destructive" }); return; }
     if (!selectedPetId) { toast({ title: t('doctor.create.validation.selectPet'), variant: "destructive" }); return; }
     if (!assignedNurseId) { toast({ title: t('doctor.create.validation.selectNurse'), variant: "destructive" }); return; }
-    if (!diagnosis.trim()) { toast({ title: t('doctor.create.validation.diagnosis'), variant: "destructive" }); return; }
-    // Required numeric vitals
-    const weightNum = Number(weight);
-    const tempNum = Number(temperature);
-    const bpStr = bloodPressure.trim();
-    const hrNum = Number(heartRate);
-    const rrNum = Number(respiratoryRate);
-    const mmStr = mucousMembrane.trim();
-    const chestStr = chestCondition.trim();
-    const notesStr = notes.trim();
     const missing: string[] = [];
-    if (!isFinite(weightNum)) missing.push(t('doctor.vitals.weight'));
-    if (!isFinite(tempNum)) missing.push(t('doctor.vitals.temperature'));
-    if (!bpStr) missing.push(t('doctor.vitals.bloodPressure'));
-    if (!isFinite(hrNum)) missing.push(t('doctor.vitals.heartRate'));
-    if (!isFinite(rrNum)) missing.push(t('doctor.vitals.respiratoryRate'));
-    if (!mmStr) missing.push(t('doctor.vitals.mucous'));
-    if (!chestStr) missing.push(t('doctor.vitals.chest'));
-    if (!notesStr) missing.push(t('doctor.vitals.notes'));
+    if (!anamnez.trim()) missing.push(t('doctor.vitals.anamnez'));
+    if (!naznacheniya.trim()) missing.push(t('doctor.vitals.naznacheniya'));
     if (missing.length) { toast({ title: t('doctor.create.validation.requiredFieldsTitle'), description: missing.join(', '), variant: 'destructive' }); return; }
     const selectedServiceEntries = Object.entries(selectedServices);
     const selectedMedicineEntries = Object.entries(selectedMedicines);
@@ -1027,17 +1006,9 @@ const DoctorDashboard = () => {
       doctor: doctorId,
       pet: selectedPetId,
       assigned_nurse: assignedNurseId,
-      diagnosis: diagnosis.trim(),
-      analyze: analyses.trim() || undefined,
-      general_condition: symptoms.trim() || undefined,
-      chest_condition: chestStr,
-      notes: notesStr,
-      weight: weightNum,
-      blood_pressure: bpStr || null,
-      mucous_membrane: mmStr,
-      heart_rate: hrNum,
-      respiratory_rate: rrNum,
-      body_temperature: tempNum,
+      general_condition: generalCondition.trim(),
+      anamnez: anamnez.trim(),
+      naznacheniya: naznacheniya.trim(),
       revisit_date: revisitDate ? new Date(revisitDate).toISOString() : null,
       recommended_feed_text: recommendedFeedText.trim() || undefined,
       status: 'OPEN',
@@ -1138,7 +1109,7 @@ const DoctorDashboard = () => {
     }
 
     setCreateCardDialogOpen(false);
-  	toast({ title: t('doctor.create.successTitle'), description: t('doctor.create.successDescription', { id: cardId }) });
+    toast({ title: t('doctor.create.successTitle'), description: t('doctor.create.successDescription', { id: cardId }) });
     resetCreateCardForm();
   };
 
@@ -1237,7 +1208,7 @@ const DoctorDashboard = () => {
     setScheduleError(null);
     try {
       const scheduleIdentifier = await ensureScheduleId(scheduleForCardId, scheduleIso);
-  if (!scheduleIdentifier) throw new Error(t('doctor.schedule.createError'));
+      if (!scheduleIdentifier) throw new Error(t('doctor.schedule.createError'));
 
       const creations: Array<{ localId: string; backendId: number }> = [];
       for (const task of scheduleTasks.filter(t => !t.persisted)) {
@@ -2091,115 +2062,22 @@ const DoctorDashboard = () => {
                         {!assignedNurseId && <p className="text-xs text-destructive">Required</p>}
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="weight">{t('doctor.vitals.weight')}</Label>
-                        <Input id="weight" type="number" required value={weight} onChange={(e) => setWeight(e.target.value)} placeholder={t('doctor.vitals.weightPlaceholder')} className={`${!String(weight||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                        {!String(weight||'').trim() && <p className="text-xs text-destructive">Required</p>}
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="temperature">{t('doctor.vitals.temperature')}</Label>
-                        <Input 
-                          id="temperature" 
-                          type="text" 
-                          inputMode="decimal"
-                          required 
-                          value={temperature} 
-                          onChange={(e) => {
-                            let val = e.target.value;
-                            // Remove non-numeric except dot
-                            val = val.replace(/[^0-9.]/g, '');
-                            // Prevent multiple dots
-                            const dotCount = (val.match(/\./g) || []).length;
-                            if (dotCount > 1) {
-                              val = val.slice(0, val.lastIndexOf('.'));
-                            }
-                            // Auto-insert dot after 2 digits if no dot yet
-                            if (/^\d{2}$/.test(val) && !val.includes('.')) {
-                              val = val + '.';
-                            }
-                            // Limit to format like 38.5 or 39.12
-                            if (/^\d{0,2}(\.\d{0,2})?$/.test(val) || val === '') {
-                              setTemperature(val);
-                            }
-                          }} 
-                          placeholder={t('doctor.vitals.temperaturePlaceholder')} 
-                          className={`${!String(temperature||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} 
-                        />
-                        {!String(temperature||'').trim() && <p className="text-xs text-destructive">Required</p>}
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="bloodp">{t('doctor.vitals.bloodPressure')}</Label>
-                        <Input 
-                          id="bloodp" 
-                          type="text" 
-                          inputMode="numeric"
-                          required 
-                          value={bloodPressure} 
-                          onChange={(e) => {
-                            let val = e.target.value;
-                            // Allow only digits, spaces, and slash
-                            val = val.replace(/[^0-9\s/]/g, '');
-                            // Normalize multiple slashes to one
-                            val = val.replace(/\/+/g, ' / ');
-                            // Normalize multiple spaces
-                            val = val.replace(/\s+/g, ' ');
-                            setBloodPressure(val);
-                          }}
-                          onKeyDown={(e) => {
-                            // On ArrowRight, auto-insert " / " if we have digits and no slash yet
-                            if (e.key === 'ArrowRight') {
-                              const val = bloodPressure.trim();
-                              // If value is 2-3 digits only (no slash yet)
-                              if (/^\d{2,3}$/.test(val)) {
-                                e.preventDefault();
-                                setBloodPressure(val + ' / ');
-                              }
-                            }
-                          }}
-                          placeholder={t('doctor.vitals.bloodPressurePlaceholder')} 
-                          className={`${!String(bloodPressure||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} 
-                        />
-                        {!String(bloodPressure||'').trim() && <p className="text-xs text-destructive">Required</p>}
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="heartrate">{t('doctor.vitals.heartRate')}</Label>
-                        <Input id="heartrate" type="number" required value={heartRate} onChange={(e) => setHeartRate(e.target.value)} placeholder={t('doctor.vitals.heartRatePlaceholder')} className={`${!String(heartRate||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                        {!String(heartRate||'').trim() && <p className="text-xs text-destructive">Required</p>}
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="resprate">{t('doctor.vitals.respiratoryRate')}</Label>
-                        <Input id="resprate" type="number" required value={respiratoryRate} onChange={(e) => setRespiratoryRate(e.target.value)} placeholder={t('doctor.vitals.respiratoryRatePlaceholder')} className={`${!String(respiratoryRate||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                        {!String(respiratoryRate||'').trim() && <p className="text-xs text-destructive">Required</p>}
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="mucous">{t('doctor.vitals.mucous')}</Label>
-                        <Input id="mucous" required value={mucousMembrane} onChange={(e) => setMucousMembrane(e.target.value)} placeholder={t('doctor.vitals.mucousPlaceholder')} className={`${!String(mucousMembrane||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                        {!String(mucousMembrane||'').trim() && <p className="text-xs text-destructive">Required</p>}
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="chest">{t('doctor.vitals.chest')}</Label>
-                        <Input id="chest" required value={chestCondition} onChange={(e) => setChestCondition(e.target.value)} placeholder={t('doctor.vitals.chestPlaceholder')} className={`${!String(chestCondition||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                        {!String(chestCondition||'').trim() && <p className="text-xs text-destructive">Required</p>}
+                      <div className="md:col-span-2 pt-2">
+                        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide border-b pb-1">{t('doctor.vitals.statusSection')}</h4>
                       </div>
                       <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="symptoms">{t('doctor.vitals.symptoms')}</Label>
-                        <Textarea id="symptoms" required value={symptoms} onChange={(e) => setSymptoms(e.target.value)} placeholder={t('doctor.vitals.symptomsPlaceholder')} className={`${!String(symptoms||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                        {!String(symptoms||'').trim() && <p className="text-xs text-destructive">Required</p>}
+                        <Label htmlFor="generalCondition">{t('doctor.vitals.generalCondition')}</Label>
+                        <Textarea id="generalCondition" value={generalCondition} onChange={(e) => setGeneralCondition(e.target.value)} placeholder={t('doctor.vitals.generalConditionPlaceholder')} className="min-h-[120px]" />
                       </div>
                       <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="diagnosis">{t('doctor.vitals.diagnosis')}</Label>
-                        <Textarea id="diagnosis" required value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder={t('doctor.vitals.diagnosisPlaceholder')} className={`${!String(diagnosis||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                        {!String(diagnosis||'').trim() && <p className="text-xs text-destructive">Required</p>}
+                        <Label htmlFor="anamnez">{t('doctor.vitals.anamnez')}</Label>
+                        <Textarea id="anamnez" required value={anamnez} onChange={(e) => setAnamnez(e.target.value)} placeholder={t('doctor.vitals.anamnezPlaceholder')} className={`min-h-[100px] ${!String(anamnez||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
+                        {!String(anamnez||'').trim() && <p className="text-xs text-destructive">Required</p>}
                       </div>
                       <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="analyses">{t('doctor.vitals.analyses')}</Label>
-                        <Textarea id="analyses" required value={analyses} onChange={(e) => setAnalyses(e.target.value)} placeholder={t('doctor.vitals.analysesPlaceholder')} className={`${!String(analyses||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                        {!String(analyses||'').trim() && <p className="text-xs text-destructive">Required</p>}
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="notes">{t('doctor.vitals.notes')}</Label>
-                        <Textarea id="notes" required value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('doctor.vitals.notesPlaceholder')} className={`${!String(notes||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                        {!String(notes||'').trim() && <p className="text-xs text-destructive">Required</p>}
+                        <Label htmlFor="naznacheniya">{t('doctor.vitals.naznacheniya')}</Label>
+                        <Textarea id="naznacheniya" required value={naznacheniya} onChange={(e) => setNaznacheniya(e.target.value)} placeholder={t('doctor.vitals.naznacheniyaPlaceholder')} className={`min-h-[100px] ${!String(naznacheniya||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
+                        {!String(naznacheniya||'').trim() && <p className="text-xs text-destructive">Required</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="revisit">{t('doctor.revisitDate')}</Label>
@@ -2536,17 +2414,8 @@ const DoctorDashboard = () => {
                     disabled={
                       !selectedClient ||
                       !selectedPetId ||
-                      !String(diagnosis || '').trim() ||
-                      !String(weight || '').trim() ||
-                      !String(temperature || '').trim() ||
-                      !String(bloodPressure || '').trim() ||
-                      !String(heartRate || '').trim() ||
-                      !String(respiratoryRate || '').trim() ||
-                      !String(mucousMembrane || '').trim() ||
-                      !String(chestCondition || '').trim() ||
-                      !String(symptoms || '').trim() ||
-                      !String(analyses || '').trim() ||
-                      !String(notes || '').trim()
+                      !String(anamnez || '').trim() ||
+                      !String(naznacheniya || '').trim()
                     }
                   >
                     {t('common.save')}
@@ -2865,29 +2734,16 @@ const DoctorDashboard = () => {
           ) : (
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="ed_diag">{t('doctor.vitals.diagnosis')}</Label>
-                <Textarea id="ed_diag" required value={editDiagnosis} onChange={(e) => setEditDiagnosis(e.target.value)} placeholder={t('doctor.vitals.diagnosisPlaceholder')} className={`${!String(editDiagnosis||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                {!String(editDiagnosis||'').trim() && <p className="text-xs text-destructive">Required</p>}
+                <Label htmlFor="ed_generalCondition">{t('doctor.vitals.generalCondition')}</Label>
+                <Textarea id="ed_generalCondition" value={editGeneralCondition} onChange={(e) => setEditGeneralCondition(e.target.value)} placeholder={t('doctor.vitals.generalConditionPlaceholder')} className="min-h-[120px]" />
               </div>
               <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="ed_an">{t('doctor.vitals.analyses')}</Label>
-                  <Textarea id="ed_an" required value={editAnalyses} onChange={(e) => setEditAnalyses(e.target.value)} placeholder={t('doctor.vitals.analysesPlaceholder')} className={`${!String(editAnalyses||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                  {!String(editAnalyses||'').trim() && <p className="text-xs text-destructive">Required</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ed_sym">{t('doctor.vitals.symptoms')}</Label>
-                  <Textarea id="ed_sym" required value={editSymptoms} onChange={(e) => setEditSymptoms(e.target.value)} placeholder={t('doctor.vitals.symptomsPlaceholder')} className={`${!String(editSymptoms||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                  {!String(editSymptoms||'').trim() && <p className="text-xs text-destructive">Required</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="ed_chest">{t('doctor.vitals.chest')}</Label>
-                  <Input id="ed_chest" required value={editChest} onChange={(e) => setEditChest(e.target.value)} placeholder={t('doctor.vitals.chestPlaceholder')} className={`${!String(editChest||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                  {!String(editChest||'').trim() && <p className="text-xs text-destructive">Required</p>}
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="ed_notes">{t('doctor.vitals.notes')}</Label>
-                  <Textarea id="ed_notes" required value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder={t('doctor.vitals.notesPlaceholder')} className={`${!String(editNotes||'').trim() ? 'border-destructive focus-visible:ring-destructive' : ''}`} />
-                  {!String(editNotes||'').trim() && <p className="text-xs text-destructive">Required</p>}
+                <Label htmlFor="ed_anamnez">{t('doctor.vitals.anamnez')}</Label>
+                <Textarea id="ed_anamnez" value={editAnamnez} onChange={(e) => setEditAnamnez(e.target.value)} placeholder={t('doctor.vitals.anamnezPlaceholder')} className="min-h-[100px]" />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="ed_naznacheniya">{t('doctor.vitals.naznacheniya')}</Label>
+                  <Textarea id="ed_naznacheniya" value={editNaznacheniya} onChange={(e) => setEditNaznacheniya(e.target.value)} placeholder={t('doctor.vitals.naznacheniyaPlaceholder')} className="min-h-[100px]" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ed_revisit">{t('doctor.revisitDate')}</Label>
@@ -3292,14 +3148,7 @@ const DoctorDashboard = () => {
               <Button
                 className="bg-gradient-hero"
                 onClick={saveEditCard}
-                disabled={
-                  editCardSaving ||
-                  !String(editDiagnosis || '').trim() ||
-                  !String(editAnalyses || '').trim() ||
-                  !String(editSymptoms || '').trim() ||
-                  !String(editChest || '').trim() ||
-                  !String(editNotes || '').trim()
-                }
+                disabled={editCardSaving}
               >
                 {editCardSaving ? t('common.saving') : t('common.save')}
               </Button>
